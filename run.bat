@@ -5,7 +5,11 @@ REM   run.bat                                → App.java (varsayılan)
 REM   run.bat scan                           → ScanTest.java
 REM   run.bat app --mrz A12345678,030505,310209  → manuel override
 setlocal
-set "JAVA_HOME=%~dp0tools\jdk8u412-b08"
+REM Sistem Java'sını kullan (Adoptium 25 64-bit)
+if not defined JAVA_HOME (
+    for /f "delims=" %%i in ('where javac') do set "JAVAC_PATH=%%i"
+    for %%i in ("%JAVAC_PATH%\..\..") do set "JAVA_HOME=%%~fi"
+)
 set "MVN=%~dp0.mvn\wrapper\apache-maven\bin\mvn.cmd"
 
 if "%1"=="scan" (

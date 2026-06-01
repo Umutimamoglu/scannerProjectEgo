@@ -35,10 +35,7 @@ import java.util.stream.Stream;
 
 public class App {
 
-    private static final Path DEMO_DIR = Paths.get(
-            "C:\\Users\\Mobiloby\\Desktop\\Yeni klasör\\CRT-603-7005-001 DEMO\\CRT-603-7005-001 DEMO");
-    private static final Path TESS = DEMO_DIR.resolve("depends\\0\\tesseract.exe");
-    private static final Path SCAN_DIR = DEMO_DIR.resolve("Img");
+    private static final Path SCAN_DIR = Paths.get("scan_output");
     private static final Path OUT_DIR = Paths.get("output");
 
     public static void main(String[] args) {
@@ -65,22 +62,14 @@ public class App {
                 exp = parts[2].trim();
                 System.out.println("Manuel BAC değerleri: docNo=" + docNo + " dob=" + dob + " exp=" + exp + "\n");
             } else {
-                Path bmp;
-                if (overrideBmp != null) {
-                    bmp = Paths.get(overrideBmp);
-                } else if (useLatest) {
-                    bmp = findLatestBackBmp(SCAN_DIR);
-                } else {
-                    System.out.println("=== Tarama (IDSIF.dll JNA üzerinden) ===");
-                    bmp = ScannerBridge.scan();
-                }
-                System.out.println("İşlenecek BMP: " + bmp);
-                MrzReader mrzReader = new MrzReader(TESS);
-                MrzReader.Mrz mrz = mrzReader.read(bmp);
-                System.out.println("OCR sonucu: " + mrz);
-                System.out.println("  MRZ satır 1: " + mrz.rawLine1);
-                System.out.println("  MRZ satır 2: " + mrz.rawLine2);
-                System.out.println("  MRZ satır 3: " + mrz.rawLine3);
+                System.out.println("=== Tarama (IDSIF.dll built-in OCR) ===");
+                ScannerBridge.ScanOutput out = ScannerBridge.scan();
+                System.out.println("Üretilen BMP: " + out.backBmp);
+                MrzReader.Mrz mrz = MrzReader.parse(out.mrzText);
+                System.out.println("MRZ parse: " + mrz);
+                System.out.println("  satır 1: " + mrz.rawLine1);
+                System.out.println("  satır 2: " + mrz.rawLine2);
+                System.out.println("  satır 3: " + mrz.rawLine3);
                 System.out.println();
                 docNo = mrz.documentNumber;
                 dob = mrz.dateOfBirth;
