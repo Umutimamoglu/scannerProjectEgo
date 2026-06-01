@@ -1,0 +1,8 @@
+{
+  "terminal.integrated.windowsUseConptyDll": true,
+  "terminal.integrated.windowsEnableConpty": true,
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "java.import.maven.enabled": true,
+  "java.import.maven.downloadSources": true,
+  "java.configuration.updateBuildConfiguration": "automatic"
+}

@@ -1,0 +1,37 @@
+# Maven
+target/
+
+# Runtime output (her çalıştırmada üretilir)
+output/
+scan_output/
+Img/
+Log/
+*.log
+demo_stdout.log
+demo_stderr.log
+
+# Portable tooling (gerektiğinde yeniden indirilebilir, çok büyük)
+tools/jdk8u412-b08/
+tools/git/
+
+# Yeni SDK (henüz entegre edilmedi, ayrıca tutuluyor)
+sdk_new/
+
+# Maven wrapper içindeki büyük Maven dağıtımı (gerektiğinde wrapper indirir)
+.mvn/wrapper/apache-maven/
+.mvn/wrapper/apache-maven-3.9.9-bin.zip
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Geçici dönüşüm dosyaları
+src/protocol_full.txt
+src/CRT_591_MRXX_Protocol*.pdf

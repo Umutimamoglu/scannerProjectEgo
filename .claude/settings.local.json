@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Force -Recurse -Depth 3 | Where-Object { -not $_.PSIsContainer } | Select-Object FullName, Length | Format-Table -AutoSize)",
+      "PowerShell($env:JAVA_HOME = \\(Get-Item \\(Get-Command javac\\).Source\\).Directory.Parent.FullName; Write-Output \"JAVA_HOME = $env:JAVA_HOME\"; .\\\\.mvn\\\\wrapper\\\\apache-maven\\\\bin\\\\mvn.cmd -v)"
+    ]
+  }
+}
