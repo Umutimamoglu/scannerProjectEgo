@@ -36,7 +36,7 @@ import java.util.stream.Stream;
 public class App {
 
     private static final Path SCAN_DIR = Paths.get("scan_output");
-    private static final Path OUT_DIR = Paths.get("output");
+    private static final Path OUT_DIR = AppPaths.resolve("output");
 
     public static void main(String[] args) {
         try {

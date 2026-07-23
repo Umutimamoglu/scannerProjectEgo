@@ -18,7 +18,8 @@ import java.util.List;
  */
 public interface IDSIF extends Library {
 
-    String NATIVE_DIR = new File("native_x64").getAbsolutePath();
+    /** Uygulama köküne göre — exe'den çalışırken de doğru bulunur. */
+    String NATIVE_DIR = AppPaths.absolute("native_x64");
 
     /** DLL'leri doğru sırada yükle, sonra Native.load ile IDSIF'i bağla. */
     static IDSIF load() {

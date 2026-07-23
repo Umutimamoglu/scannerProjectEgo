@@ -39,7 +39,7 @@ public class ScannerBridge {
             lib = IDSIF.load();
         }
 
-        String savePath = new File("scan_output").getAbsolutePath();
+        String savePath = AppPaths.ensureDir("scan_output").toAbsolutePath().toString();
         new File(savePath).mkdirs();
 
         int initRc = lib.OpenDev(savePath);

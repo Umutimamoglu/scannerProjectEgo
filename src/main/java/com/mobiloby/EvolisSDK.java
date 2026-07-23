@@ -18,7 +18,8 @@ import java.io.File;
  */
 public interface EvolisSDK extends Library {
 
-    String NATIVE_DIR = new File("native_evolis").getAbsolutePath();
+    /** Uygulama köküne göre — exe'den çalışırken de doğru bulunur. */
+    String NATIVE_DIR = AppPaths.absolute("native_evolis");
 
     static EvolisSDK load() {
         System.setProperty("jna.library.path", NATIVE_DIR);

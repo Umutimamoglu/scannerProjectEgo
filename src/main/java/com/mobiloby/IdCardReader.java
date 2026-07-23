@@ -73,7 +73,7 @@ public class IdCardReader implements AutoCloseable {
         public MrzReader.Mrz mrz;
     }
 
-    private static final Path OUT_DIR = Paths.get("output");
+    private static final Path OUT_DIR = AppPaths.resolve("output");
 
     private IDSIF lib;
     private boolean deviceOpen;
@@ -96,8 +96,7 @@ public class IdCardReader implements AutoCloseable {
                 log("Tarayıcı DLL'i yükleniyor...");
                 lib = IDSIF.load();
             }
-            String savePath = new File("scan_output").getAbsolutePath();
-            new File(savePath).mkdirs();
+            String savePath = AppPaths.ensureDir("scan_output").toAbsolutePath().toString();
             int rc = lib.OpenDev(savePath);
             if (rc != IDSIF.Ret.OK) {
                 log("Cihaz açılamadı (OpenDev=" + rc + ")"

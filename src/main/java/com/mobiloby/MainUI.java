@@ -529,15 +529,15 @@ public class MainUI extends JFrame {
             cd.idNumber = lastData.tcNo;
             cd.birthDate = lastData.birthDate;
             cd.expiryDate = lastData.expiryDate;
-            Path photo = Path.of("output", "dg2_face_1.png");
+            Path photo = AppPaths.resolve("output", "dg2_face_1.png");
             if (Files.exists(photo)) cd.photo = photo;
 
             BufferedImage img = CardRenderer.render(cd);
-            Files.createDirectories(Path.of("output"));
-            Path bmp = Path.of("output", "card_print.bmp");
+            AppPaths.ensureDir("output");
+            Path bmp = AppPaths.resolve("output", "card_print.bmp");
             javax.imageio.ImageIO.write(img, "bmp", bmp.toFile());
             javax.imageio.ImageIO.write(img, "png",
-                    Path.of("output", "card_preview.png").toFile());
+                    AppPaths.resolve("output", "card_preview.png").toFile());
             log("Kart görseli üretildi: " + bmp);
 
             if (!silent) showPreviewDialog(img);

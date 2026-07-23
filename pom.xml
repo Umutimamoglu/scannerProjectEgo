@@ -60,6 +60,49 @@
                     <release>17</release>
                 </configuration>
             </plugin>
+
+            <!--
+                Bağımlılıkları target/lib/ altına kopyala.
+                jpackage bir klasördeki tüm jar'ları alır; fat-jar yerine
+                bu yöntem tercih edildi çünkü JNA kendi native kaynaklarını
+                jar içinden çıkarır ve gölgelenmiş jar'da sorun çıkarabilir.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <overWriteReleases>false</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Uygulama jar'ı: giriş noktası ve bağımlılık yolu manifest'te -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.mobiloby.MainUI</mainClass>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix></classpathPrefix>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

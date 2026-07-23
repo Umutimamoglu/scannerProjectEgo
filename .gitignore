@@ -1,6 +1,9 @@
 # Maven
 target/
 
+# jpackage çıktısı — gömülü JRE ile ~250 MB, build-exe.bat ile üretilir
+dist/
+
 # Runtime output (her çalıştırmada üretilir)
 output/
 scan_output/

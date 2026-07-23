@@ -168,7 +168,7 @@ public class CardRenderer {
      * --ad / --soyad ile elle verin veya çipten DG11 okuyun.
      */
     public static void main(String[] args) throws Exception {
-        Path outDir = Path.of("output");
+        Path outDir = AppPaths.resolve("output");
         Files.createDirectories(outDir);
 
         CardData d = new CardData();

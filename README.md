@@ -118,6 +118,22 @@ run.bat app --mrz <belgeNo>,<doğumYYAAGG>,<sonGeçerlilikYYAAGG>
 
 Bu modda tarayıcı hiç kullanılmaz, doğrudan NFC okuyucuya geçilir.
 
+## Bağımsız uygulama (exe)
+
+```powershell
+build-exe.bat
+```
+
+`dist\KimlikKartSistemi\KimlikKartSistemi.exe` üretir — içinde gömülü JRE olan taşınabilir bir klasör (~250 MB). **Hedef makinede Java kurulu olmasına gerek yok**; klasörün tamamını kopyalamak yeterli.
+
+Hedef makinede yine de gerekli olanlar:
+- Okuyucu için **libusb-win32** sürücüsü (Zadig — kurulum adım 4)
+- Yazıcı için **Evolis Premium Suite** (sürücü)
+
+Paket `jpackage` ile üretilir (JDK 17 içinde gelir). WiX kurulu olmadığı için MSI değil `app-image` üretilir — kurulum gerektirmeyen taşınabilir klasör.
+
+> **Yol çözümlemesi:** Native klasörler (`native_x64`, `native_evolis`) exe'nin **yanında** olmalı. [AppPaths.java](src/main/java/com/mobiloby/AppPaths.java) kök dizini `jpackage.app-path` sistem özelliğinden (exe'nin konumu) çözer; paketlenmemişse çalışma dizinine düşer. Bu olmadan exe'ye çift tıklandığında DLL'ler bulunamaz.
+
 ## Grafik arayüz (önerilen kullanım)
 
 ```powershell

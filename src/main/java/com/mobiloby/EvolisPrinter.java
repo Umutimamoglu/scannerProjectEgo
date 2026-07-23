@@ -214,7 +214,7 @@ public class EvolisPrinter implements AutoCloseable {
         }
 
         if (dryRun) {
-            Path prn = Path.of("output", "card_dryrun.prn").toAbsolutePath();
+            Path prn = AppPaths.resolve("output", "card_dryrun.prn").toAbsolutePath();
             rc = lib.evolis_print_to_file(ctx, prn.toString());
             return rc == EvolisSDK.Ret.OK
                     ? new PrintResult(true, rc, "Prova başarılı — kart harcanmadı (" + prn.getFileName() + ")")

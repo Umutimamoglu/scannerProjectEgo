@@ -27,7 +27,7 @@ public class PrintCard {
         EvolisSDK lib = null;
 
         try {
-            Path bmp = Path.of("output", "card_print.bmp").toAbsolutePath();
+            Path bmp = AppPaths.resolve("output", "card_print.bmp").toAbsolutePath();
             if (!Files.exists(bmp)) {
                 System.out.println("Basılacak görsel yok: " + bmp);
                 System.out.println("Önce 'run.bat card' ile üretin.");
@@ -91,7 +91,7 @@ public class PrintCard {
 
             if (!confirmed) {
                 // PROVA: tüm hattı çalıştır, PRN üret, kart harcama
-                Path prn = Path.of("output", "card_dryrun.prn").toAbsolutePath();
+                Path prn = AppPaths.resolve("output", "card_dryrun.prn").toAbsolutePath();
                 rc = lib.evolis_print_to_file(ctx, prn.toString());
                 System.out.println("evolis_print_to_file → " + rc);
                 if (rc == EvolisSDK.Ret.OK && Files.exists(prn)) {
