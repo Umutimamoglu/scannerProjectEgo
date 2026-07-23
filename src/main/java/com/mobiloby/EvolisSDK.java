@@ -4,6 +4,7 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
 import java.io.File;
@@ -139,6 +140,105 @@ public interface EvolisSDK extends Library {
         public static class ByReference extends RibbonInfo implements Structure.ByReference {}
     }
 
+    /** evolis_get_state ana durumu. */
+    interface State {
+        int OFF = 0, READY = 1, WARNING = 2, ERROR = 3;
+    }
+
+    /** Kartın alınacağı yer. */
+    interface InputTray {
+        int FEEDER = 1, MANUAL = 2, MANUALANDCMD = 4, BEZEL = 8,
+            BOTH = 16, NOFEEDER = 32, REAR = 64;
+    }
+
+    /** Kartın gönderileceği yer. */
+    interface OutputTray {
+        int STANDARD = 1, STANDARDSTANDBY = 2, MANUAL = 4, ERROR = 8,
+            ERRORSTANDBY = 16, EJECT = 32, BEZEL = 64, ERRORSLOT = 128, LOCKED = 256;
+    }
+
+    /** Bezel (kart yuvası) davranışı. */
+    interface BezelBehavior {
+        int UNKNOWN = 0, REJECT = 1, INSERT = 2, DONOTHING = 3;
+    }
+
+    /** evolis_printer_info_t: model, seri no, firmware, donanım özellikleri. */
+    @Structure.FieldOrder({"name", "type", "mark", "markName", "model", "modelName", "modelId",
+                           "fwVersion", "serialNumber", "printHeadKitNumber", "zone",
+                           "hasFlip", "hasEthernet", "hasWifi", "hasLaminator", "hasLaminator2",
+                           "hasMagEnc", "hasJisMagEnc", "hasSmartEnc", "hasContactLessEnc",
+                           "hasLcd", "hasKineclipse", "hasLock", "hasScanner",
+                           "insertionCaps", "ejectionCaps", "rejectionCaps",
+                           "lcdFwVersion", "lcdGraphVersion", "scannerFwVersion"})
+    class PrinterInfo extends Structure {
+        public byte[] name = new byte[128];
+        public int type;
+        public int mark;
+        public byte[] markName = new byte[32];
+        public int model;
+        public byte[] modelName = new byte[32];
+        public int modelId;
+        public byte[] fwVersion = new byte[16];
+        public byte[] serialNumber = new byte[16];
+        public byte[] printHeadKitNumber = new byte[16];
+        public byte[] zone = new byte[16];
+        public boolean hasFlip;
+        public boolean hasEthernet;
+        public boolean hasWifi;
+        public boolean hasLaminator;
+        public boolean hasLaminator2;
+        public boolean hasMagEnc;
+        public boolean hasJisMagEnc;
+        public boolean hasSmartEnc;
+        public boolean hasContactLessEnc;
+        public boolean hasLcd;
+        public boolean hasKineclipse;
+        public boolean hasLock;
+        public boolean hasScanner;
+        public int insertionCaps;
+        public int ejectionCaps;
+        public int rejectionCaps;
+        public byte[] lcdFwVersion = new byte[16];
+        public byte[] lcdGraphVersion = new byte[16];
+        public byte[] scannerFwVersion = new byte[64];
+
+        public String getName()         { return str(name); }
+        public String getModelName()    { return str(modelName); }
+        public String getMarkName()     { return str(markName); }
+        public String getFwVersion()    { return str(fwVersion); }
+        public String getSerialNumber() { return str(serialNumber); }
+        public String getPrintHeadKit() { return str(printHeadKitNumber); }
+        public String getZone()         { return str(zone); }
+
+        private static String str(byte[] b) {
+            int n = 0;
+            while (n < b.length && b[n] != 0) n++;
+            return new String(b, 0, n, java.nio.charset.StandardCharsets.UTF_8);
+        }
+
+        public static class ByReference extends PrinterInfo implements Structure.ByReference {}
+    }
+
+    /** evolis_cleaning_t: baskı sayaçları ve temizlik durumu. */
+    @Structure.FieldOrder({"totalCardCount", "cardCount", "cardCountBeforeWarning",
+                           "cardCountBeforeWarrantyLost", "cardCountAtLastCleaning",
+                           "regularCleaningCount", "advancedCleaningCount",
+                           "printHeadUnderWarranty", "warningThreshold", "warrantyLostThreshold"})
+    class CleaningInfo extends Structure {
+        public int totalCardCount;                // Ömür boyu basılan kart
+        public int cardCount;                     // Son temizlikten beri
+        public int cardCountBeforeWarning;        // Temizlik uyarısına kalan
+        public int cardCountBeforeWarrantyLost;
+        public int cardCountAtLastCleaning;
+        public int regularCleaningCount;
+        public int advancedCleaningCount;
+        public boolean printHeadUnderWarranty;
+        public int warningThreshold;
+        public int warrantyLostThreshold;
+
+        public static class ByReference extends CleaningInfo implements Structure.ByReference {}
+    }
+
     /** evolis_status_t: yazıcı durum bayrakları. */
     @Structure.FieldOrder({"config", "information", "warning", "error", "exts", "session"})
     class Status extends Structure {
@@ -188,6 +288,46 @@ public interface EvolisSDK extends Library {
 
     /** Takılı ribon bilgisini oku. */
     int evolis_get_ribbon(Pointer context, RibbonInfo.ByReference ribbon);
+
+    /** Yazıcı künyesi: model, seri no, firmware, donanım özellikleri. */
+    int evolis_get_info(Pointer context, PrinterInfo.ByReference info);
+
+    /** Baskı sayaçları ve temizlik durumu. */
+    int evolis_get_cleaning(Pointer context, CleaningInfo.ByReference cleaning);
+
+    /** Aktif besleyici (Feeder A/B/C/D). */
+    int evolis_get_feeder(Pointer context, IntByReference feeder);
+
+    /** Kartın nereden alınacağı (InputTray.*). */
+    int evolis_get_input_tray(Pointer context, IntByReference tray);
+
+    /** Başarılı baskıdan sonra kartın nereye gideceği (OutputTray.*). */
+    int evolis_get_output_tray(Pointer context, IntByReference tray);
+
+    /** Hatalı kartın nereye gideceği (OutputTray.*). */
+    int evolis_get_error_tray(Pointer context, IntByReference tray);
+
+    /** Bezel davranışı (BezelBehavior.*). */
+    int evolis_bezel_get_behavior(Pointer context, IntByReference behavior);
+
+    /**
+     * Yazıcının özet durumu.
+     * @param major State.* (OFF/READY/WARNING/ERROR)
+     * @param minor detaylı sebep kodu
+     */
+    int evolis_get_state(Pointer context, IntByReference major, IntByReference minor);
+
+    /** Model ID'sinden okunabilir model adı. */
+    String evolis_get_model_name(int model);
+
+    /**
+     * Mekanik hatayı temizle ve yazıcıyı hazır duruma döndür.
+     *
+     * Baskı sırasında mekanik hata olursa (kart/ribon sıkışması) yazıcı
+     * ERR_MECHANICAL bayrağını set eder ve BAŞKA HİÇBİR İŞİ KABUL ETMEZ.
+     * Bu çağrı onu sıfırlar.
+     */
+    int evolis_clear_mechanical_errors(Pointer context);
 
     /** Baskı oturumunu başlat. */
     int evolis_print_init(Pointer context);

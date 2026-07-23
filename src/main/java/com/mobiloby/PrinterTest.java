@@ -100,7 +100,16 @@ public class PrinterTest {
                 if (shown == 0) System.out.println("    (yok)");
             }
 
-            // 4. Ribon bilgisi — tek kartımız olduğu için baskı öncesi kritik
+            // 4. İstenirse mekanik hatayı temizle (--temizle)
+            if (hasFlag(args, "--temizle")) {
+                System.out.println();
+                System.out.println("=== evolis_clear_mechanical_errors ===");
+                int crc = lib.evolis_clear_mechanical_errors(ctx);
+                System.out.println("Temizleme → " + crc +
+                        (crc == EvolisSDK.Ret.OK ? " (yazıcı hazır duruma döndü)" : " (başarısız)"));
+            }
+
+            // 5. Ribon bilgisi — tek kartımız olduğu için baskı öncesi kritik
             System.out.println();
             System.out.println("=== evolis_get_ribbon ===");
             EvolisSDK.RibbonInfo.ByReference rb = new EvolisSDK.RibbonInfo.ByReference();
@@ -114,6 +123,23 @@ public class PrinterTest {
                 System.out.println("  Kalan      : " + rb.remaining);
             }
 
+            // 6. Kart yolu yapılandırması — mekanik hata teşhisi için
+            System.out.println();
+            System.out.println("=== Kart yolu yapılandırması ===");
+            com.sun.jna.ptr.IntByReference v = new com.sun.jna.ptr.IntByReference();
+            if (lib.evolis_get_input_tray(ctx, v) == EvolisSDK.Ret.OK) {
+                System.out.println("  Giriş (input tray) : " + inputTrayName(v.getValue()));
+            }
+            if (lib.evolis_get_output_tray(ctx, v) == EvolisSDK.Ret.OK) {
+                System.out.println("  Çıkış (output tray): " + outputTrayName(v.getValue()));
+            }
+            if (lib.evolis_get_error_tray(ctx, v) == EvolisSDK.Ret.OK) {
+                System.out.println("  Hata (error tray)  : " + outputTrayName(v.getValue()));
+            }
+            if (lib.evolis_bezel_get_behavior(ctx, v) == EvolisSDK.Ret.OK) {
+                System.out.println("  Bezel davranışı    : " + bezelName(v.getValue()));
+            }
+
             lib.evolis_close(ctx);
             System.out.println();
             System.out.println("Bağlantı kapatıldı. Test tamam.");
@@ -122,6 +148,48 @@ public class PrinterTest {
             System.err.println("KRİTİK HATA: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private static String inputTrayName(int v) {
+        switch (v) {
+            case EvolisSDK.InputTray.FEEDER:       return "FEEDER (hazne)";
+            case EvolisSDK.InputTray.MANUAL:       return "MANUAL (elle besleme)";
+            case EvolisSDK.InputTray.MANUALANDCMD: return "MANUALANDCMD";
+            case EvolisSDK.InputTray.BEZEL:        return "BEZEL (yuvadan)";
+            case EvolisSDK.InputTray.BOTH:         return "BOTH";
+            case EvolisSDK.InputTray.NOFEEDER:     return "NOFEEDER";
+            case EvolisSDK.InputTray.REAR:         return "REAR (arkadan)";
+            default:                               return "bilinmeyen (" + v + ")";
+        }
+    }
+
+    private static String outputTrayName(int v) {
+        switch (v) {
+            case EvolisSDK.OutputTray.STANDARD:        return "STANDARD (normal çıkış)";
+            case EvolisSDK.OutputTray.STANDARDSTANDBY: return "STANDARDSTANDBY";
+            case EvolisSDK.OutputTray.MANUAL:          return "MANUAL";
+            case EvolisSDK.OutputTray.ERROR:           return "ERROR (hata kutusu)";
+            case EvolisSDK.OutputTray.ERRORSTANDBY:    return "ERRORSTANDBY";
+            case EvolisSDK.OutputTray.EJECT:           return "EJECT (dışarı at)";
+            case EvolisSDK.OutputTray.BEZEL:           return "BEZEL (yuvaya ver)";
+            case EvolisSDK.OutputTray.ERRORSLOT:       return "ERRORSLOT (ret yuvası)";
+            case EvolisSDK.OutputTray.LOCKED:          return "LOCKED (kilitli)";
+            default:                                   return "bilinmeyen (" + v + ")";
+        }
+    }
+
+    private static String bezelName(int v) {
+        switch (v) {
+            case EvolisSDK.BezelBehavior.REJECT:    return "REJECT (geri al/ret)";
+            case EvolisSDK.BezelBehavior.INSERT:    return "INSERT (içeri al)";
+            case EvolisSDK.BezelBehavior.DONOTHING: return "DONOTHING (bekle)";
+            default:                                return "UNKNOWN (" + v + ")";
+        }
+    }
+
+    private static boolean hasFlag(String[] args, String flag) {
+        for (String a : args) if (a.equals(flag)) return true;
+        return false;
     }
 
     private static String modelName(int model) {

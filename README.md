@@ -118,13 +118,45 @@ run.bat app --mrz <belgeNo>,<doğumYYAAGG>,<sonGeçerlilikYYAAGG>
 
 Bu modda tarayıcı hiç kullanılmaz, doğrudan NFC okuyucuya geçilir.
 
+## Grafik arayüz (önerilen kullanım)
+
+```powershell
+run.bat ui
+```
+
+Tek pencereden hem okuyucu hem yazıcı yönetilir. Konsol komutları hâlâ çalışır ama günlük kullanım için arayüz daha pratik.
+
+**Okuyucu paneli:** Kart varlığı 800 ms'de bir yoklanır ve durum satırında gösterilir ("Cihazda kart yok" / "Kart cihazda — TARA'ya basabilirsiniz"). `KARTI TARA` tek düğmede tarama + OCR + BAC + çip okuma yapar; alanlar ve biyometrik fotoğraf dolar. İsimler DG11'den okunduğu için **Türkçe karakterler doğru gelir** (`İMAMOĞLU`, `ÖDEMİŞ`).
+
+**Yazıcı paneli:** Model, seri no, firmware, baskı kafası kiti, ribon tipi/kapasitesi/kalanı, toplam basılan kart, temizliğe kalan kart ve açık durum bayrakları. Düğmeler: `Bilgileri Yenile`, `Hatayı Temizle`, `Kart Önizleme Üret`, `Prova Bas`, `KART BAS`.
+
+**Güvenlik davranışları:**
+- Kimlik okutulmadan `KART BAS`'a basılırsa uyarı verir, kart harcamaz
+- Gerçek baskı öncesi onay diyaloğu çıkar
+- Yazıcıda hata bayrağı varsa baskı reddedilir (önce `Hatayı Temizle`)
+- Baskı görseli her seferinde yeniden üretilir — diskte kalan eski dosya basılmaz
+
+Tüm donanım çağrıları `SwingWorker` içinde arka planda çalışır, arayüz donmaz. Cihazlar sonradan takılırsa `Cihazları Yeniden Bağla` ile yeniden aranır.
+
+### Mimari
+
+```
+MainUI ──> IdCardReader ──> IDSIF.dll (tarama/OCR) + JMRTD (BAC, DG okuma)
+       └─> EvolisPrinter ──> evolis.dll (durum, ribon, sayaç, baskı)
+           CardRenderer  ──> Java2D ile kart görseli
+```
+
+`IdCardReader`, `App.java`'daki mantığın konsoldan bağımsız hâli — hiçbir yerde `stdin` beklemez, ilerlemeyi callback ile bildirir.
+
 ## Kart baskısı (Evolis KC Prime)
 
 ### Komutlar
 
 | Komut | Ne yapar |
 |---|---|
-| `run.bat printer` | Yazıcı bağlantı testi: cihaz listesi, durum bayrakları, ribon bilgisi |
+| `run.bat ui` | Grafik arayüz — hem okuyucu hem yazıcı (yukarıya bakın) |
+| `run.bat printer` | Yazıcı testi: cihaz, durum bayrakları, ribon, kart yolu yapılandırması |
+| `run.bat printer --temizle` | Mekanik hata bayrağını temizler |
 | `run.bat card` | Kart görselini üretir → `output/card_preview.png` + `card_print.bmp` |
 | `run.bat print` | **Prova** — baskı hattını çalıştırır, PRN üretir, **kart harcamaz** |
 | `run.bat print --onayla` | **Gerçek baskı** — kartı harcar |
@@ -252,15 +284,65 @@ ClassCastException: org.bouncycastle.asn1.DLApplicationSpecific cannot be cast t
 
 BouncyCastle / JMRTD arasında ASN.1 ayrıştırma uyumsuzluğu. PACE için gerekli; BAC kullanıldığı sürece engelleyici değil.
 
-### 6. Baskı sonrası `ERR_MECHANICAL`
+### 6. Baskı sonrası `ERR_MECHANICAL` — yapışkan bayrak
 
-İlk gerçek baskı denemesinde kart başarıyla basıldı ancak `evolis_print_exect` `-22` (`PRINT_EMECHANICAL`) döndü ve `ERR_MECHANICAL` bayrağı set oldu. Baskının kendisi çıktı, hata kart çıkışı/besleme aşamasında oluştu — hazne tek kartla çalıştığı için boşalmış olması muhtemel sebep (`INF_FEEDER_NEAR_EMPTY` de set).
+İlk gerçek baskı denemesinde kart başarıyla basıldı ancak `evolis_print_exect` `-22` (`PRINT_EMECHANICAL`) döndü ve `ERR_MECHANICAL` (bayrak ID 184) set oldu. Baskının kendisi çıktı; hata kart çıkışı/besleme aşamasında oluştu — hazne tek kartla çalıştığı için boşalmış olması muhtemel sebep (`INF_FEEDER_NEAR_EMPTY` de set).
 
-Daha fazla kartla tekrar denenip doğrulanması gerekiyor. Hata bayrağı set kaldığı sürece sonraki baskılar reddedilebilir; kapağı açıp kapatarak temizlenir.
+**Bu bayrak kendiliğinden temizlenmez ve temizlenene kadar yazıcı yeni iş kabul etmez.** SDK dokümantasyonundaki ifade:
 
-### 7. Kart tasarımı Türkçe isimleri MRZ'den alamaz
+> *"Sometimes a mechanical error happens while printing. In this case, the printer will not accept any other job. Calling this method will help you reset the printer in a ready state."*
 
-MRZ standardı yalnızca ASCII taşır — `İMAMOĞLU` yerine `IMAMOGLU` gelir. Doğru yazım çipte **DG11'de var** ama `App.java` DG11'i ekrana yazıyor, dosyaya kaydetmiyor. Geçici çözüm: `run.bat card --ad ... --soyad ...` ile elle vermek. Kalıcı çözüm: `App.java`'da DG11'i de `output/` altına kaydetmek.
+Yani bir sonraki baskı denemesinden **önce** mutlaka temizlenmeli, yoksa iş reddedilir.
+
+**Temizleme yolları:**
+
+| Yöntem | Nasıl |
+|---|---|
+| Kodla | `evolis_clear_mechanical_errors(context)` |
+| Fiziksel | Yazıcının kapağını açıp kapatmak |
+
+**Her testten önce durum kontrolü alışkanlık haline getirilmeli:**
+
+```powershell
+run.bat printer
+```
+
+Çıktıdaki "Açık bayraklar" listesine bakın. `ERR_` ile başlayan bir bayrak varsa baskı denemeyin — önce temizleyin. Bayrak isimleri [EvolisFlags.java](src/main/java/com/mobiloby/EvolisFlags.java) içinde (256 bayrak, dizi indeksi = bayrak ID'si); `evolis_status_is_on` ile sorgulanıp hex yerine okunabilir isim olarak basılıyor.
+
+Sık karşılaşılan bayraklar:
+
+| Bayrak | Anlamı |
+|---|---|
+| `ERR_MECHANICAL` (184) | Kart/ribon sıkışması — yazıcı kilitli, temizlenmeli |
+| `ERR_REJECT_BOX_FULL` (185) | Ret kutusu dolu |
+| `ERR_HARDWARE` (203) | Donanım arızası — desteğe başvurulmalı |
+| `INF_FEEDER_NEAR_EMPTY` (95) | Hazne boşalmak üzere — kart yükleyin |
+| `WAR_COVER_OPEN` | Kapak açık |
+| `WAR_NO_RIBBON` | Ribon takılı değil |
+
+### 7. Türkçe isimler — arayüzde çözüldü, CLI'da duruyor
+
+MRZ standardı yalnızca ASCII taşır — `İMAMOĞLU` yerine `IMAMOGLU` gelir. Doğru yazım çipte **DG11'de var**.
+
+Arayüz (`run.bat ui`) DG11'i okuduğu için sorun yok. Ancak CLI tarafında `App.java` DG11'i ekrana yazıp dosyaya kaydetmiyor, bu yüzden `run.bat card` MRZ'ye düşüyor. Geçici çözüm: `run.bat card --ad ... --soyad ...`. Kalıcı çözüm: `App.java`'nın DG11'i `output/` altına kaydetmesi.
+
+### 9. Her baskıdan sonra `ERR_MECHANICAL` (araştırılıyor)
+
+İki ayrı baskı denemesinde de aynı desen görüldü:
+
+1. Baskı **başarıyla tamamlanıyor** — ribon sayacı düşüyor, kart üzerinde baskıyla çıkıyor
+2. `evolis_print_exect` `-22` (`PRINT_EMECHANICAL`) dönüyor
+3. `ERR_MECHANICAL` bayrağı set oluyor ve temizlenene kadar yeni iş kabul edilmiyor
+
+Elenen ihtimaller:
+- **Veri/yazılım değil** — `print_to_file` provası sorunsuz geçiyor
+- **Kart bitmesi değil** — `ERR_FEEDER_EMPTY` bayrağı yanmıyor, yalnızca `INF_FEEDER_NEAR_EMPTY`
+- **Bezel zaman aşımı değil** — bezel davranışı `DONOTHING`, gecikme sonunda aksiyon tetiklemiyor
+- Evolis Print Center da ek bilgi vermiyor, o da yalnızca "Mekanik hata" diyor
+
+En güçlü hipotez: yazıcı baskıdan sonra **bir sonraki kartı önden yola almaya** çalışıyor; hazne boş olduğu için besleme hareketi başarısız oluyor. Her iki denemede de haznede tek kart vardı, yani baskıdan sonra hazne boş kalıyordu. Bu, hatanın baskı sırasında değil **sonrasında** gelmesini açıklıyor.
+
+Dolu hazneyle test edilip doğrulanması gerekiyor. Doğrulanmazsa sıradaki adımlar: Print Center → Araçlar → "Yazıcı düzenli temizlik sihirbazı" ve "Hata ayıklama modu etkinleştirme".
 
 ### 8. Kart yerleşimi kalibre edilmedi
 

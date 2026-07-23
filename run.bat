@@ -33,5 +33,10 @@ if "%1"=="print" (
     "%MVN%" exec:java -Dexec.mainClass=com.mobiloby.PrintCard -Dexec.args="%*"
     goto :eof
 )
+if "%1"=="ui" (
+    shift
+    "%MVN%" exec:java -Dexec.mainClass=com.mobiloby.MainUI -Dexec.args="%*"
+    goto :eof
+)
 if "%1"=="app" shift
 "%MVN%" exec:java -Dexec.mainClass=com.mobiloby.App -Dexec.args="%*"
