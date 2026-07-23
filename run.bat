@@ -3,6 +3,7 @@ REM Tek komutla 32-bit JDK ile Maven çalıştır.
 REM Kullanım:
 REM   run.bat                                → App.java (varsayılan)
 REM   run.bat scan                           → ScanTest.java
+REM   run.bat printer                        → PrinterTest.java (Evolis bağlantı testi)
 REM   run.bat app --mrz A12345678,030505,310209  → manuel override
 setlocal
 REM Sistem Java'sını kullan (Adoptium 25 64-bit)
@@ -15,6 +16,21 @@ set "MVN=%~dp0.mvn\wrapper\apache-maven\bin\mvn.cmd"
 if "%1"=="scan" (
     shift
     "%MVN%" exec:java -Dexec.mainClass=com.mobiloby.ScanTest -Dexec.args="%*"
+    goto :eof
+)
+if "%1"=="printer" (
+    shift
+    "%MVN%" exec:java -Dexec.mainClass=com.mobiloby.PrinterTest -Dexec.args="%*"
+    goto :eof
+)
+if "%1"=="card" (
+    shift
+    "%MVN%" exec:java -Dexec.mainClass=com.mobiloby.CardRenderer -Dexec.args="%*"
+    goto :eof
+)
+if "%1"=="print" (
+    shift
+    "%MVN%" exec:java -Dexec.mainClass=com.mobiloby.PrintCard -Dexec.args="%*"
     goto :eof
 )
 if "%1"=="app" shift

@@ -1,14 +1,16 @@
 # id-scanner
 
-CRT-603-7005 kart okuyucu ile T.C. kimlik kartı / e-pasaport okuma uygulaması.
+T.C. kimlik kartından veri okuyup, okunan bilgilerle kişiselleştirilmiş kart basan uçtan uca sistem.
 
-Pipeline iki aşamalı:
+Pipeline üç aşamalı:
 
 1. **Optik tarama** — `IDSIF.dll` (JNA üzerinden) kartın ön/arka yüzünü 300 DPI tarar ve dahili OCR ile MRZ (Machine Readable Zone) metnini çıkarır.
 2. **Çip okuma** — MRZ'den türetilen BAC anahtarıyla NFC üzerinden çipe bağlanılır, JMRTD ile veri grupları (DG) okunur.
+3. **Kart baskısı** — okunan veri Java2D ile karta çizilir, `evolis.dll` (JNA) üzerinden Evolis KC Prime yazıcıya gönderilir.
 
 ```
-Kart yerleştir → ScanMRZ (tara + OCR) → Move(EJECT_HALF) → BAC → DG'leri oku → output/
+OKUMA:  Kart yerleştir → ScanMRZ (tara + OCR) → Move(EJECT_HALF) → BAC → DG'leri oku → output/
+BASKI:  output/ verisi → CardRenderer (Java2D) → BMP → evolis.dll → KC Prime
 ```
 
 ## Gereksinimler
@@ -17,11 +19,14 @@ Kart yerleştir → ScanMRZ (tara + OCR) → Move(EJECT_HALF) → BAC → DG'ler
 |---|---|
 | JDK | 17+ (test edilen: Temurin 17.0.19) |
 | Maven | 3.9.9 — repoda yok, `mvnw.cmd` indirir |
-| Donanım | CRT-603-7005 kart okuyucu (USB VID `0483`, PID `5710`) |
-| USB sürücü | **libusb-win32 v1.4.0.0** — aşağıya bakın, kritik |
+| Okuyucu donanımı | CRT-603-7005 (USB VID `0483`, PID `5710`) |
+| Okuyucu USB sürücü | **libusb-win32 v1.4.0.0** — aşağıya bakın, kritik |
 | Model dosyaları | `native_x64/depends/` — repoda yok, üretici paketinden gelir |
+| Yazıcı donanımı | Evolis KC Prime (USB VID `0f49`, PID `0b91`) |
+| Yazıcı yazılımı | Evolis Premium Suite (sürücü için) |
+| Evolis SDK | `native_evolis/evolis.dll` — repoda mevcut |
 
-> **Not:** `native_x64/depends/` ve USB sürücüsü repoda bulunmaz. Temiz bir makinede kurulum yapıyorsanız "Kurulum" bölümündeki 3. ve 4. adımlar zorunludur, atlanırsa uygulama çalışmaz.
+> **Not:** `native_x64/depends/` ve okuyucunun USB sürücüsü repoda bulunmaz. Temiz bir makinede kurulum yapıyorsanız "Kurulum" bölümündeki 3. ve 4. adımlar zorunludur, atlanırsa uygulama çalışmaz.
 
 ## Kurulum
 
@@ -113,6 +118,57 @@ run.bat app --mrz <belgeNo>,<doğumYYAAGG>,<sonGeçerlilikYYAAGG>
 
 Bu modda tarayıcı hiç kullanılmaz, doğrudan NFC okuyucuya geçilir.
 
+## Kart baskısı (Evolis KC Prime)
+
+### Komutlar
+
+| Komut | Ne yapar |
+|---|---|
+| `run.bat printer` | Yazıcı bağlantı testi: cihaz listesi, durum bayrakları, ribon bilgisi |
+| `run.bat card` | Kart görselini üretir → `output/card_preview.png` + `card_print.bmp` |
+| `run.bat print` | **Prova** — baskı hattını çalıştırır, PRN üretir, **kart harcamaz** |
+| `run.bat print --onayla` | **Gerçek baskı** — kartı harcar |
+
+Türkçe karakterler için isimleri elle verin (MRZ sadece ASCII taşır, `İ`/`Ğ`/`Ş` yok):
+
+```powershell
+run.bat card --ad UMUT --soyad İMAMOĞLU
+run.bat card --baslik "BAŞKENT KART" --altbaslik "ULAŞIM"
+```
+
+### Bağlantı mimarisi
+
+`evolis.dll` doğrudan JNA ile çağrılır — okuyucudaki `IDSIF.dll` ile aynı desen. Üç bağlantı modu var (`OpenMode`):
+
+| Mod | Anlamı |
+|---|---|
+| `DIRECT` | Yazıcıyla doğrudan iletişim — **kullandığımız mod** |
+| `SUPERVISED` | Evolis Supervision Service üzerinden (Premium Suite gerekir) |
+| `AUTO` | Otomatik seçer |
+
+`DIRECT` çalıştığı doğrulandı, yani üretimde Premium Suite'e bağımlı değiliz. Suite yine de teşhis aracı olarak faydalı (Print Center ile yazıcıyı görmek, test kartı basmak).
+
+> `evolis.dll`, PyPI'daki resmi `Evolis-SDK` paketinden (v9.4.1, Evolis SDK v3) çıkarıldı. JNA imzaları paketin kendi Python ctypes bağlayıcılarından birebir alındı — tahmin edilmedi.
+
+### Yarım panel ribon kısıtı — önemli
+
+Takılı ribon **Color Half YMCKO** (`R5H004NAA`, tip 3 = YMCKOS). Yarım panel ribonlarda renkli (YMC) paneller kartın yalnızca **~1/3'lük bir bandını** kaplar; K (siyah) ve O (koruyucu) tam boy. Sonuç:
+
+- Fotoğraf **tek renkli öğe** olmalı ve kartın uzun ekseninde **~28 mm'yi aşmamalı** (kodda 26 mm)
+- Diğer her şey **saf siyah** (0,0,0) olmalı ki K paneliyle bassın
+- Tüm kartı kaplayan renkli zemin bu ribonla **mümkün değil** — onun için tam panel YMCKO gerekir
+
+`GShortPanelManagement=AUTO` ayarıyla yazıcı renkli bölgeyi kendi bulup paneli oraya konumlandırır.
+
+### Baskı ayarları
+
+`PrintCard` şu ayarları veriyor (`evolis_print_set_setting`):
+
+| Anahtar | Değer | Neden |
+|---|---|---|
+| `Orientation` (128) | `PORTRAIT` | Tasarım dikey — bitmap'i biz döndürmüyoruz |
+| `GShortPanelManagement` (55) | `AUTO` | Yarım panel ribonun renkli bandını yazıcı konumlandırsın |
+
 ## Çıktılar
 
 ### `output/` — çipten okunan veriler
@@ -159,6 +215,10 @@ T.C. kimlik kartında bulunan 6 DG (SOD'un `DG hash sayısı: 6` alanıyla doğr
 | `Okuyucu bulunamadı!` | PC/SC okuyucu görünmüyor | Cihazın bağlı olduğundan ve `Smart Card` servisinin çalıştığından emin olun |
 | `No line found` (NoSuchElementException) | Program stdin'den Enter bekliyor ama terminal etkileşimli değil | Etkileşimli bir terminalde çalıştırın |
 | DG2 PNG'ye çevrilemiyor | JP2 (JPEG 2000) plugin eksik | `jai-imageio-jpeg2000` bağımlılığı `pom.xml`'de mevcut; JPEG çıkan kartlarda sorun olmaz |
+| Yazıcı: `Bulunan cihaz sayısı: 0` | Yazıcı kapalı/takılı değil veya sürücü yok | Yazıcıyı açın; Evolis Premium Suite kurulu olduğundan emin olun |
+| Yazıcı: `evolis_print_exect → -22` + `ERR_MECHANICAL` | Kart sıkışması / ribon sıkışması / hazne boş | Kartı ve ribonu kontrol edin, hazneye kart koyun; hata bayrağını temizlemek için kapağı açıp kapatın |
+| Yazıcı: `-21 PRINT_NEEDACTION` | Yazıcı basmaya hazır değil | Ribon, kapak, hazne durumunu kontrol edin |
+| `INF_FEEDER_NEAR_EMPTY` | Kart haznesi boşalmak üzere | Boş kart yükleyin |
 
 ## Bilinen eksikler
 
@@ -192,19 +252,39 @@ ClassCastException: org.bouncycastle.asn1.DLApplicationSpecific cannot be cast t
 
 BouncyCastle / JMRTD arasında ASN.1 ayrıştırma uyumsuzluğu. PACE için gerekli; BAC kullanıldığı sürece engelleyici değil.
 
+### 6. Baskı sonrası `ERR_MECHANICAL`
+
+İlk gerçek baskı denemesinde kart başarıyla basıldı ancak `evolis_print_exect` `-22` (`PRINT_EMECHANICAL`) döndü ve `ERR_MECHANICAL` bayrağı set oldu. Baskının kendisi çıktı, hata kart çıkışı/besleme aşamasında oluştu — hazne tek kartla çalıştığı için boşalmış olması muhtemel sebep (`INF_FEEDER_NEAR_EMPTY` de set).
+
+Daha fazla kartla tekrar denenip doğrulanması gerekiyor. Hata bayrağı set kaldığı sürece sonraki baskılar reddedilebilir; kapağı açıp kapatarak temizlenir.
+
+### 7. Kart tasarımı Türkçe isimleri MRZ'den alamaz
+
+MRZ standardı yalnızca ASCII taşır — `İMAMOĞLU` yerine `IMAMOGLU` gelir. Doğru yazım çipte **DG11'de var** ama `App.java` DG11'i ekrana yazıyor, dosyaya kaydetmiyor. Geçici çözüm: `run.bat card --ad ... --soyad ...` ile elle vermek. Kalıcı çözüm: `App.java`'da DG11'i de `output/` altına kaydetmek.
+
+### 8. Kart yerleşimi kalibre edilmedi
+
+`CardRenderer` içindeki mm cinsinden koordinatlar referans görselin oranlarından tahmin edildi. Gerçek baskı üzerinde ölçülüp düzeltilmesi gerekir.
+
 ## Proje yapısı
 
 ```
 ├── src/main/java/com/mobiloby/
 │   ├── App.java              # Ana akış: tarama → BAC → DG okuma
 │   ├── ScannerBridge.java    # IDSIF.dll sarmalayıcı (JNA)
-│   ├── IDSIF.java            # DLL fonksiyon/struct tanımları
-│   └── MrzReader.java        # MRZ ayrıştırma
-├── native_x64/               # 64-bit SDK (IDSIF.dll, OpenCV, OCR, libusb)
+│   ├── IDSIF.java            # Okuyucu DLL fonksiyon/struct tanımları
+│   ├── MrzReader.java        # MRZ ayrıştırma
+│   ├── EvolisSDK.java        # evolis.dll JNA arayüzü (yazıcı)
+│   ├── EvolisFlags.java      # 256 durum bayrağı ismi (ID = dizi indeksi)
+│   ├── PrinterTest.java      # Yazıcı bağlantı/durum/ribon testi
+│   ├── CardRenderer.java     # Kart görselini üretir (Java2D) — baskı YAPMAZ
+│   └── PrintCard.java        # Baskı — varsayılan prova, --onayla ile gerçek
+├── native_x64/               # Okuyucu SDK (IDSIF.dll, OpenCV, OCR, libusb)
 │   ├── depends/              # ⚠️ Repoda yok — üretici paketinden kopyalanmalı
 │   └── Img/                  # Taranan BMP'ler (üzerine yazılır)
-├── native/                   # Eski 32-bit SDK (kullanılmıyor)
-├── output/                   # Çipten okunan veriler
+├── native_evolis/            # Yazıcı SDK (evolis.dll, Evolis SDK v3)
+├── native/                   # Eski 32-bit okuyucu SDK (kullanılmıyor)
+├── output/                   # Çipten okunan veriler + kart görselleri (gitignore)
 ├── config.ini                # Tarayıcı ayarları (VID/PID, DPI, görüntü işleme)
 ├── run.bat                   # Çalıştırma script'i
 └── mvnw.cmd                  # Maven bootstrap
@@ -217,5 +297,5 @@ BouncyCastle / JMRTD arasında ASN.1 ayrıştırma uyumsuzluğu. PACE için gere
 | `org.jmrtd:jmrtd` | 0.7.31 | ICAO MRTD / çip okuma |
 | `net.sf.scuba:scuba-sc-j2se` | 0.0.19 | Akıllı kart soyutlaması |
 | `org.bouncycastle:bcprov-jdk15on` | 1.70 | Kriptografi |
-| `net.java.dev.jna:jna` | 5.14.0 | `IDSIF.dll` çağrıları |
+| `net.java.dev.jna:jna` | 5.14.0 | `IDSIF.dll` ve `evolis.dll` çağrıları |
 | `com.github.jai-imageio:jai-imageio-jpeg2000` | 1.4.0 | JP2 fotoğraf çözme |
