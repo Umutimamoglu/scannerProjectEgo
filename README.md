@@ -268,6 +268,138 @@ T.C. kimlik kartında bulunan 6 DG (SOD'un `DG hash sayısı: 6` alanıyla doğr
 | Yazıcı: `-21 PRINT_NEEDACTION` | Yazıcı basmaya hazır değil | Ribon, kapak, hazne durumunu kontrol edin |
 | `INF_FEEDER_NEAR_EMPTY` | Kart haznesi boşalmak üzere | Boş kart yükleyin |
 
+## Hata kodu referansı
+
+### Yazıcı — dönüş kodları (`evolis.dll`)
+
+Kodlar ön eke göre gruplanır; ön ek hatanın hangi katmanda olduğunu söyler.
+
+**Genel** (0 … −8)
+
+| Kod | Sabit | Anlamı |
+|---|---|---|
+| `0` | `OK` | Sorun yok |
+| `-1` | `EUNDEFINED` | Tanımsız hata |
+| `-2` | `EINTERNAL` | Kütüphane içi mantık hatası |
+| `-3` | `ECANCELLED` | İşlem tamamlanmadan iptal edildi |
+| `-4` | `EDISABLED` | İstenen özellik devre dışı |
+| `-5` | `EUNSUPPORTED` | Kütüphane veya yazıcı bu özelliği desteklemiyor |
+| `-6` | `EPARAMS` | API'ye geçersiz parametre verildi |
+| `-7` | `ETIMEOUT` | Çağrı zaman aşımına uğradı |
+| `-8` | `ENEEDACTION` | Yazıcı hazır değil — ribon, kapak, hazne kontrol edin |
+
+**Baskı** (`PRINT_`, −20 … −29) — en sık karşılaşılanlar
+
+| Kod | Sabit | Anlamı |
+|---|---|---|
+| `-20` | `PRINT_EDATA` | Geçersiz girdi — görsel ve ayarları kontrol edin |
+| `-21` | `PRINT_NEEDACTION` | Yazıcı basmaya hazır değil — ribon/kapak/hazne |
+| `-22` | `PRINT_EMECHANICAL` | **Baskı sırasında mekanik hata** (bizim karşılaştığımız) |
+| `-25` | `PRINT_EUNKNOWNRIBBON` | `GRibbonType` ayarı eksik |
+| `-26` | `PRINT_ENOIMAGE` | Görsel verilmemiş |
+| `-27` | `PRINT_WSETTING` | Sürücüden alınan ayarlardan biri okunamadı |
+| `-28` | `PRINT_EJOB` | Baskı işi oluşturulmamış veya süresi dolmuş |
+| `-29` | `PRINT_ESESSION` | Aktif oturum yok |
+
+**Oturum** (`SESSION_`, −10 … −14)
+
+| Kod | Sabit | Anlamı |
+|---|---|---|
+| `-10` | `SESSION_ETIMEOUT` | Yazıcı rezervasyonu süresi doldu |
+| `-11` | `SESSION_EBUSY` | Yazıcı kullanımda, başka oturum var |
+| `-12` | `SESSION_DISABLED` | Oturum yönetimi kapalı |
+| `-13` | `SESSION_FAILED` | Rezervasyon başarısız |
+
+**Yazıcı iletişimi** (`PRINTER_`, −60 … −81)
+
+| Kod | Sabit | Anlamı |
+|---|---|---|
+| `-60` | `PRINTER_ENOCOM` | Yazıcı çevrimdışı |
+| `-61` | `PRINTER_EREPLY` | Yazıcı yanıtı "ERR" içeriyor |
+| `-64` | `PRINTER_NOSTATUS` | Yazıcıda durum bildirimi kapalı |
+| `-65` | `PRINTER_EMODEL` | Geçersiz yazıcı modeli |
+| `-80` | `PRINTER_NETWORK_ERROR` | Ağ işlemi hatası |
+
+**Kart hareketi** (`CARD_`) · **Çip** (`SMART_`) · **Manyetik** (`MAG_`)
+
+| Kod | Sabit | Anlamı |
+|---|---|---|
+| `-200` | `CARD_ERROR` | Kart hareketi sırasında hata |
+| `-201` | `CARD_EINSERTION` | Kart girişi sırasında hata |
+| `-300` | `SMART_ERROR` | Akıllı kart işlemi hatası |
+| `-301` | `SMART_ENOCOM` | PCSC okuyucu ile iletişim kurulamadı |
+| `-302` | `SMART_ENOCARD` | Okuma/kodlama için kart yok |
+| `-303` | `SMART_EBUSY` | Kart zaten bir PCSC kodlayıcıya bağlı |
+| `-50` | `MAG_ERROR` | Manyetik veri okuma/yazma hatası |
+| `-51` | `MAG_EDATA` | Manyetik ize yazılacak veri geçersiz |
+| `-52` | `MAG_EBLANK` | Manyetik iz boş |
+
+Diğer gruplar: `LAM_` (−40…−43, laminasyon modülü), `SYSTEM_` (−500…−504, işletim sistemi), `USER_` (−600…−604, kimlik doğrulama), `SVC_` (−10000…−10006, Evolis servisi), `HTTP_` (−20000…, ağ). Bunlar bu projede kullanılmıyor.
+
+### Yazıcı — durum bayrakları
+
+`evolis_status_is_on(status, id)` ile sorgulanır, 256 bayrak vardır. Ön ek türü belirler:
+
+| Ön ek | Anlamı | Ne yapmalı |
+|---|---|---|
+| `CFG_` | Yapılandırma — hangi donanım özellikleri var | Bilgi amaçlı, aksiyon gerekmez |
+| `INF_` | Bilgi — anlık durum | Genelde aksiyon gerekmez |
+| `WAR_` | Uyarı — çalışmaya devam eder ama dikkat | Duruma göre |
+| `ERR_` | **Hata — yazıcı iş kabul etmez** | Giderilmeli, sonra temizlenmeli |
+| `RSV_` | Rezerve, kullanılmıyor | Yok sayın |
+
+Sık karşılaşılanlar:
+
+| ID | Bayrak | Anlamı |
+|---|---|---|
+| 184 | `ERR_MECHANICAL` | Kart veya ribon sıkışması — `evolis_clear_mechanical_errors` ile temizlenir |
+| 185 | `ERR_REJECT_BOX_FULL` | Ret kutusu dolu |
+| 203 | `ERR_HARDWARE` | Donanım arızası — desteğe başvurun |
+| — | `ERR_FEEDER_EMPTY` | Hazne boş |
+| — | `ERR_COVER_OPEN` | Kapak açık |
+| — | `ERR_RIBBON_ENDED` | Ribon bitti |
+| 95 | `INF_FEEDER_NEAR_EMPTY` | Hazne boşalmak üzere |
+| 54 | `INF_CARD_FEEDER` | Hazne mevcut |
+| — | `WAR_COOLING` | Baskı kafası soğuyor |
+| — | `WAR_NO_RIBBON` | Ribon takılı değil |
+
+Tam liste: [EvolisFlags.java](src/main/java/com/mobiloby/EvolisFlags.java) — dizi indeksi bayrak ID'sidir.
+
+### Okuyucu — dönüş kodları (`IDSIF.dll`)
+
+Kaynak: `native_x64/crtIDS.h`.
+
+| Kod | Sabit | Anlamı |
+|---|---|---|
+| `1` | `OK_Back` | Başarılı — arka yüzden MRZ okundu |
+| `0` | `OK` | Başarılı |
+| `-1` | `ERR_NOOPEN` | Cihaz açılmamış (`OpenDev` çağrılmadı) |
+| `-2` | `ERR_ALREADYOPEN` | Cihaz zaten açık |
+| `-3` | `ERR_NODEVICE` | **Cihaz bulunamadı** — USB/sürücü kontrol edin |
+| `-4` | `ERR_OPEN` | Cihaz açılamadı |
+| `-5` | `ERR_COMMAND` | Komut çalıştırma hatası |
+| `-6` | `ERR_RECVTIMEOUT` | Veri alma zaman aşımı |
+| `-7` / `-8` | `ERR_RECVFAILD` / `ERR_SENDFAILD` | Veri alma / gönderme başarısız |
+| `-9` | `COMM_ERR` | İletişim hatası |
+| `-11` | `ERR_SCAN_GETCARD` | Tarama sırasında kart durumu alınamadı |
+| `-12` | `ERR_SCAN_CARD_IN_GATE` | Kart girişte — taramayı tekrarlayın |
+| `-13` | `ERR_SCAN_NOCARD` | Tarama sırasında kart yok |
+| `-14` | `ERR_IMG_INVALID` | Görüntü dosyası geçersiz |
+| `-18` | `ERR_MRZOCR` | **MRZ OCR hatası** |
+| `-19` | `PARAM` | Geçersiz parametre |
+| `-20` | `ERR_NOCARD` | Kart yok |
+| `-22` | `ERR_MRZ` | **MRZ hatası** |
+| `-23` | `ERR_MRZ_DGKEY` | MRZ'den BAC anahtarı türetilemedi |
+| `-25` | `ERR_READ` | Okuma başarısız |
+| `-27` | `ERR_MEDIA` | Medya hatası |
+| `-98` | `ERR` | Genel hata |
+| `-99` | `ERR_UNAUTHORIZED` | Yetkisiz |
+| `-106` | `ERR_JAM` | **Kart sıkıştı** |
+| `-110` | `ERR_UNSUPPORTED` | Desteklenmeyen işlev |
+| `-111` … `-115` | `ERR_SIDE/MODE/TYPE/DPI/DELAY` | Desteklenmeyen tarama parametresi |
+| `-116` | `ERR_RF` | **RF/NFC okuma başarısız** |
+| `-160` … `-162` | `ERR_CISDATA` / `SetCISParam` / `LoadDllFail` | Tarayıcı sensörü / DLL yükleme |
+
 ## Bilinen eksikler
 
 ### 1. Kimlik doğrulama (authenticity) yapılmıyor — en önemlisi
