@@ -99,8 +99,7 @@ public class IdCardReader implements AutoCloseable {
             String savePath = AppPaths.ensureDir("scan_output").toAbsolutePath().toString();
             int rc = lib.OpenDev(savePath);
             if (rc != IDSIF.Ret.OK) {
-                log("Cihaz açılamadı (OpenDev=" + rc + ")"
-                        + (rc == IDSIF.Ret.ERR_NODEVICE ? " — cihaz bulunamadı, USB/sürücü kontrol edin" : ""));
+                log("Cihaz açılamadı: " + IDSIF.Ret.name(rc));
                 return false;
             }
             deviceOpen = true;
@@ -165,7 +164,7 @@ public class IdCardReader implements AutoCloseable {
         long dt = System.currentTimeMillis() - t0;
 
         if (rc != IDSIF.Ret.OK && rc != IDSIF.Ret.OK_BACK) {
-            throw new IllegalStateException("Tarama başarısız (ScanMRZ=" + rc + ")");
+            throw new IllegalStateException("Tarama başarısız — " + IDSIF.Ret.name(rc));
         }
 
         ScanResult out = new ScanResult();

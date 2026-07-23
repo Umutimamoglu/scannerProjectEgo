@@ -76,11 +76,120 @@ public interface IDSIF extends Library {
         int IMAGE = 1, ID_CN = 2, PASS_CN = 3, ONLY_ID = 4, ONLY_ALIEN = 5;
     }
 
+    /** Dönüş kodları — crtIDS.h içindeki _IDS_RET numaralandırmasının tamamı. */
     interface Ret {
-        int OK = 0, OK_BACK = 1;
-        int ERR_NOOPEN = -1, ERR_ALREADYOPEN = -2, ERR_NODEVICE = -3, ERR_OPEN = -4;
-        int ERR_MRZOCR = -18, ERR_MRZ = -22, ERR_NOCARD = -20;
-        int ERR_RF = -116, ERR_UNAUTHORIZED = -99;
+        int OK_BACK = 1;                  // Başarılı, MRZ arka yüzden okundu
+        int OK = 0;
+
+        int ERR_NOOPEN = -1;              // Cihaz açılmamış
+        int ERR_ALREADYOPEN = -2;         // Cihaz zaten açık
+        int ERR_NODEVICE = -3;            // Cihaz bulunamadı
+        int ERR_OPEN = -4;                // Cihaz açılamadı
+        int ERR_COMMAND = -5;
+        int ERR_RECVTIMEOUT = -6;
+        int ERR_RECVFAILD = -7;
+        int ERR_SENDFAILD = -8;
+        int COMM_ERR = -9;
+        int ERR_RECVSCAN_ERROR = -10;
+        int ERR_SCAN_GETCARD = -11;
+        int ERR_SCAN_CARD_IN_GATE = -12;  // Kart girişte, taramayı tekrarla
+        int ERR_SCAN_NOCARD = -13;
+        int ERR_IMG_INVALID = -14;
+        int ERR_SAVEJPG = -15;
+        int ERR_SAVEPNG = -16;
+        int ERR_IMGNAME = -17;
+        int ERR_MRZOCR = -18;             // MRZ OCR başarısız
+        int PARAM = -19;
+        int ERR_NOCARD = -20;
+        int ERR_4E = -21;
+        int ERR_MRZ = -22;
+        int ERR_MRZ_DGKEY = -23;          // MRZ'den BAC anahtarı türetilemedi
+        int ERR_SAVEBMP = -24;
+        int ERR_READ = -25;
+        int ERR_WLT = -26;
+        int ERR_MEDIA = -27;
+        int ERR_FINGER = -28;
+        int HEADER_ERR = -96;
+        int PACKAGE_ERR = -97;
+        int ERR = -98;
+        int ERR_UNAUTHORIZED = -99;
+        int ERR_MUTEX = -100;
+        int ERR_GET_PIC_DATA = -101;
+        int ERR_FILE_NOT_EXIST = -102;
+        int ERR_RECOGNIZE_QR_FAILED = -103;
+        int ERR_NO_QR = -104;
+        int ERR_SAVEPIC = -105;
+        int ERR_JAM = -106;               // Kart sıkıştı
+        int ERR_UNSUPPORTED = -110;
+        int ERR_SIDE = -111;
+        int ERR_MODE = -112;
+        int ERR_TYPE = -113;
+        int ERR_DPI = -114;
+        int ERR_DELAY = -115;
+        int ERR_RF = -116;                // RF/NFC okuma başarısız
+        int ERR_CPUEMV = -150;
+        int ERR_CISDATA = -160;
+        int ERR_SET_CIS_PARAM = -161;
+        int ERR_LOAD_DLL = -162;
+
+        /** Kodun okunabilir açıklaması — hata mesajlarında sayı yerine bunu kullanın. */
+        static String name(int rc) {
+            switch (rc) {
+                case OK_BACK:                 return "OK (MRZ arka yüzden okundu)";
+                case OK:                      return "OK";
+                case ERR_NOOPEN:              return "ERR_NOOPEN (cihaz açılmamış)";
+                case ERR_ALREADYOPEN:         return "ERR_ALREADYOPEN (cihaz zaten açık)";
+                case ERR_NODEVICE:            return "ERR_NODEVICE (cihaz bulunamadı — USB/sürücü kontrol edin)";
+                case ERR_OPEN:                return "ERR_OPEN (cihaz açılamadı)";
+                case ERR_COMMAND:             return "ERR_COMMAND (komut hatası)";
+                case ERR_RECVTIMEOUT:         return "ERR_RECVTIMEOUT (veri alma zaman aşımı)";
+                case ERR_RECVFAILD:           return "ERR_RECVFAILD (veri alınamadı)";
+                case ERR_SENDFAILD:           return "ERR_SENDFAILD (komut gönderilemedi)";
+                case COMM_ERR:                return "COMM_ERR (iletişim hatası)";
+                case ERR_RECVSCAN_ERROR:      return "ERR_RECVSCAN_ERROR (tarama verisi alınamadı)";
+                case ERR_SCAN_GETCARD:        return "ERR_SCAN_GETCARD (kart durumu alınamadı)";
+                case ERR_SCAN_CARD_IN_GATE:   return "ERR_SCAN_CARD_IN_GATE (kart girişte — taramayı tekrarlayın)";
+                case ERR_SCAN_NOCARD:         return "ERR_SCAN_NOCARD (tarama sırasında kart yok)";
+                case ERR_IMG_INVALID:         return "ERR_IMG_INVALID (görüntü dosyası geçersiz)";
+                case ERR_SAVEJPG:             return "ERR_SAVEJPG (JPG kaydedilemedi)";
+                case ERR_SAVEPNG:             return "ERR_SAVEPNG (PNG kaydedilemedi)";
+                case ERR_IMGNAME:             return "ERR_IMGNAME (görüntü adı boş)";
+                case ERR_MRZOCR:              return "ERR_MRZOCR (MRZ OCR başarısız)";
+                case PARAM:                   return "PARAM (geçersiz parametre)";
+                case ERR_NOCARD:              return "ERR_NOCARD (kart yok)";
+                case ERR_4E:                  return "ERR_4E (cihaz 4E yanıtı döndü)";
+                case ERR_MRZ:                 return "ERR_MRZ (MRZ hatası)";
+                case ERR_MRZ_DGKEY:           return "ERR_MRZ_DGKEY (MRZ'den BAC anahtarı türetilemedi)";
+                case ERR_SAVEBMP:             return "ERR_SAVEBMP (BMP kaydedilemedi)";
+                case ERR_READ:                return "ERR_READ (okuma başarısız)";
+                case ERR_WLT:                 return "ERR_WLT (fotoğraf çözme başarısız)";
+                case ERR_MEDIA:               return "ERR_MEDIA (medya hatası)";
+                case ERR_FINGER:              return "ERR_FINGER (parmak izi okunamadı)";
+                case HEADER_ERR:              return "HEADER_ERR (paket başlığı hatalı)";
+                case PACKAGE_ERR:             return "PACKAGE_ERR (paket uzunluğu hatalı)";
+                case ERR:                     return "ERR (genel hata)";
+                case ERR_UNAUTHORIZED:        return "ERR_UNAUTHORIZED (yetkisiz)";
+                case ERR_MUTEX:               return "ERR_MUTEX (kilit alınamadı)";
+                case ERR_GET_PIC_DATA:        return "ERR_GET_PIC_DATA (görüntü verisi alınamadı)";
+                case ERR_FILE_NOT_EXIST:      return "ERR_FILE_NOT_EXIST (dosya yok)";
+                case ERR_RECOGNIZE_QR_FAILED: return "ERR_RECOGNIZE_QR_FAILED (QR okunamadı)";
+                case ERR_NO_QR:               return "ERR_NO_QR (QR bulunamadı)";
+                case ERR_SAVEPIC:             return "ERR_SAVEPIC (görüntü kaydedilemedi)";
+                case ERR_JAM:                 return "ERR_JAM (kart sıkıştı)";
+                case ERR_UNSUPPORTED:         return "ERR_UNSUPPORTED (desteklenmeyen işlev)";
+                case ERR_SIDE:                return "ERR_SIDE (desteklenmeyen tarama yüzü)";
+                case ERR_MODE:                return "ERR_MODE (desteklenmeyen renk modu)";
+                case ERR_TYPE:                return "ERR_TYPE (desteklenmeyen kart tipi)";
+                case ERR_DPI:                 return "ERR_DPI (desteklenmeyen çözünürlük)";
+                case ERR_DELAY:               return "ERR_DELAY (gecikme aralık dışında)";
+                case ERR_RF:                  return "ERR_RF (RF/NFC okuma başarısız)";
+                case ERR_CPUEMV:              return "ERR_CPUEMV (çip ATR bilgisi EMV formatında değil)";
+                case ERR_CISDATA:             return "ERR_CISDATA (tarayıcı sensör verisi okunamadı)";
+                case ERR_SET_CIS_PARAM:       return "ERR_SET_CIS_PARAM (tarayıcı parametresi ayarlanamadı)";
+                case ERR_LOAD_DLL:            return "ERR_LOAD_DLL (DLL yüklenemedi)";
+                default:                      return "bilinmeyen kod " + rc;
+            }
+        }
     }
 
     // === Struct'lar (header'dan) ===
