@@ -93,48 +93,9 @@ Get-WmiObject Win32_PnPEntity | Where-Object { $_.DeviceID -match "VID_0483&PID_
 
 Beklenen: `ConfigManagerErrorCode: 0`, `Service: libusb0`
 
-## Çalıştırma
+## Kullanım
 
-```powershell
-run.bat
-```
-
-Akış:
-
-1. `KARTI CİHAZA YERLEŞTİRİN, sonra ENTER` → kartı koyup **Enter** (Q = iptal)
-2. Tarama + OCR (~2.5 sn), MRZ ekrana basılır
-3. Kart otomatik NFC pozisyonuna taşınır (`Move=EJECT_HALF`)
-4. BAC ile çipe bağlanılır, DG'ler okunur ve `output/` klasörüne yazılır
-
-### MRZ'yi elle vererek taramayı atlama
-
-Tarayıcı olmadan yalnızca çip okumak için:
-
-```powershell
-run.bat app --mrz <belgeNo>,<doğumYYAAGG>,<sonGeçerlilikYYAAGG>
-```
-
-Örnek: `run.bat app --mrz A12345678,030505,310209`
-
-Bu modda tarayıcı hiç kullanılmaz, doğrudan NFC okuyucuya geçilir.
-
-## Bağımsız uygulama (exe)
-
-```powershell
-build-exe.bat
-```
-
-`dist\KimlikKartSistemi\KimlikKartSistemi.exe` üretir — içinde gömülü JRE olan taşınabilir bir klasör (~250 MB). **Hedef makinede Java kurulu olmasına gerek yok**; klasörün tamamını kopyalamak yeterli.
-
-Hedef makinede yine de gerekli olanlar:
-- Okuyucu için **libusb-win32** sürücüsü (Zadig — kurulum adım 4)
-- Yazıcı için **Evolis Premium Suite** (sürücü)
-
-Paket `jpackage` ile üretilir (JDK 17 içinde gelir). WiX kurulu olmadığı için MSI değil `app-image` üretilir — kurulum gerektirmeyen taşınabilir klasör.
-
-> **Yol çözümlemesi:** Native klasörler (`native_x64`, `native_evolis`) exe'nin **yanında** olmalı. [AppPaths.java](src/main/java/com/mobiloby/AppPaths.java) kök dizini `jpackage.app-path` sistem özelliğinden (exe'nin konumu) çözer; paketlenmemişse çalışma dizinine düşer. Bu olmadan exe'ye çift tıklandığında DLL'ler bulunamaz.
-
-## Grafik arayüz (önerilen kullanım)
+### Grafik arayüz (önerilen)
 
 ```powershell
 run.bat ui
@@ -164,25 +125,46 @@ MainUI ──> IdCardReader ──> IDSIF.dll (tarama/OCR) + JMRTD (BAC, DG okum
 
 `IdCardReader`, `App.java`'daki mantığın konsoldan bağımsız hâli — hiçbir yerde `stdin` beklemez, ilerlemeyi callback ile bildirir.
 
-## Kart baskısı (Evolis KC Prime)
+### Bağımsız uygulama (exe)
 
-### Komutlar
+```powershell
+build-exe.bat
+```
+
+`dist\KimlikKartSistemi\KimlikKartSistemi.exe` üretir — arayüzün, içinde gömülü JRE bulunan taşınabilir hâli (~250 MB). **Hedef makinede Java kurulu olmasına gerek yok**; klasörün tamamını kopyalamak yeterli.
+
+Hedef makinede yine de gerekli olanlar:
+- Okuyucu için **libusb-win32** sürücüsü (Zadig — kurulum adım 4)
+- Yazıcı için **Evolis Premium Suite** (sürücü)
+
+Paket `jpackage` ile üretilir (JDK 17 içinde gelir). WiX kurulu olmadığı için MSI değil `app-image` üretilir — kurulum gerektirmeyen taşınabilir klasör.
+
+> **Yol çözümlemesi:** Native klasörler (`native_x64`, `native_evolis`) exe'nin **yanında** olmalı. [AppPaths.java](src/main/java/com/mobiloby/AppPaths.java) kök dizini `jpackage.app-path` sistem özelliğinden (exe'nin konumu) çözer; paketlenmemişse çalışma dizinine düşer. Bu olmadan exe'ye çift tıklandığında DLL'ler bulunamaz.
+
+### Konsol komutları
+
+Arayüz olmadan, tek tek adımları çalıştırmak için:
 
 | Komut | Ne yapar |
 |---|---|
-| `run.bat ui` | Grafik arayüz — hem okuyucu hem yazıcı (yukarıya bakın) |
-| `run.bat printer` | Yazıcı testi: cihaz, durum bayrakları, ribon, kart yolu yapılandırması |
+| `run.bat` | Tam okuma akışı: tarama → OCR → BAC → DG'ler → `output/` |
+| `run.bat app --mrz <belgeNo>,<doğumYYAAGG>,<sonGeçerlilikYYAAGG>` | Taramayı atlar, doğrudan çipi okur |
+| `run.bat printer` | Yazıcı testi: cihaz, durum bayrakları, ribon, kart yolu |
 | `run.bat printer --temizle` | Mekanik hata bayrağını temizler |
-| `run.bat card` | Kart görselini üretir → `output/card_preview.png` + `card_print.bmp` |
-| `run.bat print` | **Prova** — baskı hattını çalıştırır, PRN üretir, **kart harcamaz** |
-| `run.bat print --onayla` | **Gerçek baskı** — kartı harcar |
+| `run.bat card` | Kart görselini üretir (`output/card_preview.png` + `card_print.bmp`) |
+| `run.bat print` | **Prova** — baskı hattını çalıştırır, kart harcamaz |
+| `run.bat print --onayla` | **Gerçek baskı** — kart harcar |
 
-Türkçe karakterler için isimleri elle verin (MRZ sadece ASCII taşır, `İ`/`Ğ`/`Ş` yok):
+`run.bat` akışı: kartı cihaza koyup **Enter** (Q = iptal) → tarama + OCR (~2.5 sn) → kart NFC pozisyonuna taşınır → BAC ile çipe bağlanılır → veriler `output/` altına yazılır.
+
+Türkçe karakterler için isimleri elle verin (MRZ sadece ASCII taşır):
 
 ```powershell
 run.bat card --ad UMUT --soyad İMAMOĞLU
 run.bat card --baslik "BAŞKENT KART" --altbaslik "ULAŞIM"
 ```
+
+## Kart baskısı (Evolis KC Prime)
 
 ### Bağlantı mimarisi
 
@@ -432,41 +414,41 @@ ClassCastException: org.bouncycastle.asn1.DLApplicationSpecific cannot be cast t
 
 BouncyCastle / JMRTD arasında ASN.1 ayrıştırma uyumsuzluğu. PACE için gerekli; BAC kullanıldığı sürece engelleyici değil.
 
-### 6. Baskı sonrası `ERR_MECHANICAL` — yapışkan bayrak
+### 6. Her baskıdan sonra `ERR_MECHANICAL` — çözülmedi, araştırılıyor
 
-İlk gerçek baskı denemesinde kart başarıyla basıldı ancak `evolis_print_exect` `-22` (`PRINT_EMECHANICAL`) döndü ve `ERR_MECHANICAL` (bayrak ID 184) set oldu. Baskının kendisi çıktı; hata kart çıkışı/besleme aşamasında oluştu — hazne tek kartla çalıştığı için boşalmış olması muhtemel sebep (`INF_FEEDER_NEAR_EMPTY` de set).
+İki ayrı baskı denemesinde de aynı desen görüldü:
 
-**Bu bayrak kendiliğinden temizlenmez ve temizlenene kadar yazıcı yeni iş kabul etmez.** SDK dokümantasyonundaki ifade:
+1. Baskı **başarıyla tamamlanıyor** — ribon sayacı düşüyor, kart üzerinde baskıyla çıkıyor
+2. `evolis_print_exect` `-22` (`PRINT_EMECHANICAL`) dönüyor
+3. `ERR_MECHANICAL` (bayrak ID 184) set oluyor
+
+Hata baskı **sırasında** değil **sonrasında** geliyor — baskının kendisi sağlam.
+
+**Elenen ihtimaller:**
+
+| İhtimal | Nasıl elendi |
+|---|---|
+| Veri / yazılım hatası | `print_to_file` provası sorunsuz geçiyor |
+| Kart bitmesi | `ERR_FEEDER_EMPTY` yanmıyor, yalnızca `INF_FEEDER_NEAR_EMPTY` (bilgi amaçlı) |
+| Bezel zaman aşımı | Bezel davranışı `DONOTHING` — gecikme sonunda aksiyon tetiklemiyor |
+| Baskının hiç olmaması | Ribon 406 → 404 düştü, kart basılı çıktı |
+
+Evolis Print Center da ek bilgi vermiyor; o da yalnızca "Mekanik hata" diyor.
+
+**Doğrulanmamış hipotez:** Yazıcı baskıdan sonra bir sonraki kartı önden yola almaya çalışıyor, hazne boş olduğu için besleme hareketi başarısız oluyor. Her iki denemede de haznede tek kart vardı — yani değişken hiç değişmedi. Dolu hazneyle test edilmeli. Doğrulanmazsa sıradaki adımlar: Print Center → Araçlar → "Hata ayıklama modu etkinleştirme" ve "Yazıcı düzenli temizlik sihirbazı".
+
+**Bayrak yapışkandır — temizlenmeden yazıcı yeni iş kabul etmez.** SDK'nın ifadesi:
 
 > *"Sometimes a mechanical error happens while printing. In this case, the printer will not accept any other job. Calling this method will help you reset the printer in a ready state."*
 
-Yani bir sonraki baskı denemesinden **önce** mutlaka temizlenmeli, yoksa iş reddedilir.
-
-**Temizleme yolları:**
-
-| Yöntem | Nasıl |
+| Temizleme yolu | Nasıl |
 |---|---|
+| Arayüzden | `Hatayı Temizle` düğmesi |
+| Konsoldan | `run.bat printer --temizle` |
 | Kodla | `evolis_clear_mechanical_errors(context)` |
 | Fiziksel | Yazıcının kapağını açıp kapatmak |
 
-**Her testten önce durum kontrolü alışkanlık haline getirilmeli:**
-
-```powershell
-run.bat printer
-```
-
-Çıktıdaki "Açık bayraklar" listesine bakın. `ERR_` ile başlayan bir bayrak varsa baskı denemeyin — önce temizleyin. Bayrak isimleri [EvolisFlags.java](src/main/java/com/mobiloby/EvolisFlags.java) içinde (256 bayrak, dizi indeksi = bayrak ID'si); `evolis_status_is_on` ile sorgulanıp hex yerine okunabilir isim olarak basılıyor.
-
-Sık karşılaşılan bayraklar:
-
-| Bayrak | Anlamı |
-|---|---|
-| `ERR_MECHANICAL` (184) | Kart/ribon sıkışması — yazıcı kilitli, temizlenmeli |
-| `ERR_REJECT_BOX_FULL` (185) | Ret kutusu dolu |
-| `ERR_HARDWARE` (203) | Donanım arızası — desteğe başvurulmalı |
-| `INF_FEEDER_NEAR_EMPTY` (95) | Hazne boşalmak üzere — kart yükleyin |
-| `WAR_COVER_OPEN` | Kapak açık |
-| `WAR_NO_RIBBON` | Ribon takılı değil |
+Her baskı denemesinden önce `run.bat printer` (veya arayüzde `Bilgileri Yenile`) ile durum kontrolü alışkanlık haline getirilmeli — `ERR_` ile başlayan bir bayrak varsa baskı reddedilir.
 
 ### 7. Türkçe isimler — arayüzde çözüldü, CLI'da duruyor
 
@@ -474,27 +456,15 @@ MRZ standardı yalnızca ASCII taşır — `İMAMOĞLU` yerine `IMAMOGLU` gelir.
 
 Arayüz (`run.bat ui`) DG11'i okuduğu için sorun yok. Ancak CLI tarafında `App.java` DG11'i ekrana yazıp dosyaya kaydetmiyor, bu yüzden `run.bat card` MRZ'ye düşüyor. Geçici çözüm: `run.bat card --ad ... --soyad ...`. Kalıcı çözüm: `App.java`'nın DG11'i `output/` altına kaydetmesi.
 
-### 9. Her baskıdan sonra `ERR_MECHANICAL` (araştırılıyor)
-
-İki ayrı baskı denemesinde de aynı desen görüldü:
-
-1. Baskı **başarıyla tamamlanıyor** — ribon sayacı düşüyor, kart üzerinde baskıyla çıkıyor
-2. `evolis_print_exect` `-22` (`PRINT_EMECHANICAL`) dönüyor
-3. `ERR_MECHANICAL` bayrağı set oluyor ve temizlenene kadar yeni iş kabul edilmiyor
-
-Elenen ihtimaller:
-- **Veri/yazılım değil** — `print_to_file` provası sorunsuz geçiyor
-- **Kart bitmesi değil** — `ERR_FEEDER_EMPTY` bayrağı yanmıyor, yalnızca `INF_FEEDER_NEAR_EMPTY`
-- **Bezel zaman aşımı değil** — bezel davranışı `DONOTHING`, gecikme sonunda aksiyon tetiklemiyor
-- Evolis Print Center da ek bilgi vermiyor, o da yalnızca "Mekanik hata" diyor
-
-En güçlü hipotez: yazıcı baskıdan sonra **bir sonraki kartı önden yola almaya** çalışıyor; hazne boş olduğu için besleme hareketi başarısız oluyor. Her iki denemede de haznede tek kart vardı, yani baskıdan sonra hazne boş kalıyordu. Bu, hatanın baskı sırasında değil **sonrasında** gelmesini açıklıyor.
-
-Dolu hazneyle test edilip doğrulanması gerekiyor. Doğrulanmazsa sıradaki adımlar: Print Center → Araçlar → "Yazıcı düzenli temizlik sihirbazı" ve "Hata ayıklama modu etkinleştirme".
-
 ### 8. Kart yerleşimi kalibre edilmedi
 
 `CardRenderer` içindeki mm cinsinden koordinatlar referans görselin oranlarından tahmin edildi. Gerçek baskı üzerinde ölçülüp düzeltilmesi gerekir.
+
+### 9. Temassız çip kodlanamıyor
+
+Yazıcının künyesi `hasContactLessEnc = false` diyor — temassız (RFID/MIFARE) kodlayıcı ünitesi bu cihazda takılı değil. Çipli kartın **üzerine baskı yapılabilir** ama **çipine veri yazılamaz**.
+
+KC Prime bu modülü opsiyon olarak destekliyor, yani model kısıtı değil donanım eksikliği. Ulaşım kartı gibi çipin çalışması gereken bir üründe bu modül gerekecek.
 
 ## Proje yapısı
 
