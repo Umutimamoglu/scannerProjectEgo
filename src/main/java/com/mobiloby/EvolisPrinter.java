@@ -20,6 +20,29 @@ public class EvolisPrinter implements AutoCloseable {
 
     private static final int PRINT_TIMEOUT_MS = 5 * 60_000;
 
+    /**
+     * Yarım panel renkli bandın konumlanma yöntemi: AUTO | CUSTOM | OFF.
+     *
+     * AUTO'da bandı yazıcı kendi yerleştirir; dikey (PORTRAIT) tasarımda bandı
+     * fotoğrafın çok altına koyduğu gözlendi — fotoğraf yalnızca K paneliyle
+     * basılıp açık tonlar kayboldu. Bu yüzden CUSTOM ile elle konumlandırıyoruz.
+     */
+    public static String shortPanelMode = "CUSTOM";
+
+    /**
+     * CUSTOM modda bandın kaydırma miktarı. PRN'de "Psp;<değer>" olarak gider.
+     *
+     * ETKİSİ YOK — kalibrasyon kartıyla ölçüldü, 0 ve 36 değerleri birebir aynı
+     * kartı bastı; bant her durumda ~47,5 mm'de başlıyor. Negatif değerler ise
+     * yazıcıda sessizce Psp;3'e dönüşüyor (yani reddedilmeleri bile belirtilmiyor).
+     *
+     * Bu yüzden bandın yeri sabit kabul edildi ve tasarım ona göre kuruldu:
+     * fotoğraf CardRenderer.BAND_START_MM..BAND_END_MM arasına yerleştirildi.
+     * Değer 0'da bırakıldı — AUTO görüntü içeriğine göre değişebildiği için
+     * CUSTOM ile sabitlemek baskıyı öngörülebilir kılıyor.
+     */
+    public static int shortPanelShift = 0;
+
     private final EvolisSDK lib;
     private Pointer ctx;
     private String printerName;
@@ -203,9 +226,13 @@ public class EvolisPrinter implements AutoCloseable {
             return new PrintResult(false, rc, "print_init başarısız");
         }
 
-        // Dikey tasarım + yarım panel ribon için otomatik renkli bant konumlama
+        // Dikey tasarım + yarım panel ribon renkli bant konumlama
         lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.ORIENTATION, "PORTRAIT");
-        lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.G_SHORT_PANEL_MANAGEMENT, "AUTO");
+        lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.G_SHORT_PANEL_MANAGEMENT, shortPanelMode);
+        if ("CUSTOM".equals(shortPanelMode)) {
+            lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.I_SHORT_PANEL_SHIFT,
+                    String.valueOf(shortPanelShift));
+        }
 
         rc = lib.evolis_print_set_imagep(ctx, EvolisSDK.CardFace.FRONT,
                 imagePath.toAbsolutePath().toString());

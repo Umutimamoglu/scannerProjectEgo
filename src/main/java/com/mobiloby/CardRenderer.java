@@ -18,10 +18,10 @@ import java.nio.file.Path;
  * Takılı ribon "Color Half YMCKO" (R5H004NAA). Yarım panel ribonlarda renkli
  * (YMC) paneller kartın yalnızca ~1/3'lük bir bandını kaplar; K (siyah) ve
  * O (koruyucu) tam boy. Bu yüzden:
- *   - Fotoğraf TEK renkli öğe olmalı ve kartın uzun ekseninde ~28 mm'yi aşmamalı
+ *   - Fotoğraf TEK renkli öğe olmalı ve BAND_START_MM..BAND_END_MM arasında durmalı
  *   - Diğer her şey saf siyah (0,0,0) olmalı ki K paneliyle bassın
- * GShortPanelManagement=AUTO ayarıyla yazıcı renkli bölgeyi kendi bulup
- * paneli oraya konumlandırır.
+ * Bandın yeri kalibrasyon kartıyla ölçüldü ve yazılımla oynatılamıyor
+ * (bkz. BAND_START_MM). Bu yüzden fotoğraf kartın alt yarısında.
  *
  * Baskı YAPMAZ — sadece PNG önizleme üretir. Baskı için PrintCard kullanılır.
  */
@@ -33,8 +33,16 @@ public class CardRenderer {
 
     public static final int DPI = 300;
 
-    /** Renkli bandın güvenli üst sınırı (mm) — yarım panel kısıtı. */
-    static final double COLOR_BAND_MAX_MM = 28.0;
+    /**
+     * Renkli bandın kart üzerindeki GERÇEK konumu (mm) — kalibrasyon kartıyla ölçüldü.
+     *
+     * Yarım panel ribonda YMC panelleri kartın yalnızca bir bandını kaplar ve bu
+     * bant SABİTTİR: IShortPanelShift ayarı (PRN'de "Psp;N") denendi, 0/36/1000
+     * değerlerinin hiçbiri bandı oynatmadı. Bu yüzden tasarım banda uydurulur,
+     * bant tasarıma değil — renkli olması gereken her şey bu aralıkta durmalı.
+     */
+    static final double BAND_START_MM = 47.5;
+    static final double BAND_END_MM = 85.6;
 
     // === Yerleşim (mm) ===
 
@@ -46,13 +54,17 @@ public class CardRenderer {
     static double SUBTITLE_Y_MM = 14.0;
     static double SUBTITLE_FONT_MM = 2.8;
 
-    /** Fotoğraf kutusu — renkli banda sığmalı. */
+    /**
+     * Fotoğraf kutusu — renkli bandın İÇİNDE olmalı, yoksa yalnızca K paneliyle
+     * basılır ve açık tonlar (yüz) kaybolup geriye sadece saç gibi koyu yerler kalır.
+     * 54,0-80,0 aralığı bandın (47,5-85,6) ortasına oturur, iki yanda ~6 mm pay bırakır.
+     */
     static double PHOTO_W_MM = 20.0;
     static double PHOTO_H_MM = 26.0;
-    static double PHOTO_Y_MM = 19.0;
+    static double PHOTO_Y_MM = 54.0;
 
-    /** Bilgi alanları. */
-    static double FIELD_START_Y_MM = 50.0;
+    /** Bilgi alanları — fotoğrafın üstünde, bandın dışında (saf siyah, K paneli basar). */
+    static double FIELD_START_Y_MM = 20.0;
     static double FIELD_STEP_MM = 6.5;
     static double LABEL_FONT_MM = 2.3;
     static double VALUE_FONT_MM = 3.0;
@@ -140,6 +152,54 @@ public class CardRenderer {
         return img;
     }
 
+    /**
+     * Kalibrasyon hedefi — yarım panel renkli bandın kartın neresine düştüğünü ölçer.
+     *
+     * Kart boyunca her 5 mm'de bir renkli çubuk ve yanında SİYAH mm etiketi var.
+     * Siyah etiketler K paneliyle her yere basılır, renkli çubuklar ise yalnızca
+     * YMC bandının denk geldiği yerde görünür. Yani basılan kartta hangi
+     * numaraların hizasında renk çıktıysa bant oradadır.
+     */
+    public static BufferedImage renderCalibration() {
+        int w = mmToPx(CARD_W_MM);
+        int h = mmToPx(CARD_H_MM);
+
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, w, h);
+
+        int labelW = mmToPx(9.0);
+        int barX = labelW + mmToPx(1.0);
+        int barW = w - barX - mmToPx(2.0);
+        int barH = mmToPx(3.6);
+
+        g.setFont(new Font("Arial", Font.BOLD, mmToPx(2.8)));
+        for (int mm = 5; mm <= 80; mm += 5) {
+            int y = mmToPx(mm);
+
+            // Renkli çubuk — sadece YMC bandının içinde görünür.
+            // Ardışık çubuklar farklı renkte: bandın kenarları da ayırt edilebilsin.
+            g.setColor((mm / 5) % 2 == 0 ? new Color(220, 0, 0) : new Color(0, 110, 220));
+            g.fillRect(barX, y - barH / 2, barW, barH);
+
+            // Siyah etiket ve çizgi — K paneliyle kartın her yerine basılır.
+            g.setColor(Color.BLACK);
+            g.drawString(String.valueOf(mm), mmToPx(2.0), y + mmToPx(1.0));
+            g.fillRect(labelW, y - mmToPx(0.15), mmToPx(1.0), mmToPx(0.3));
+        }
+
+        g.setFont(new Font("Arial", Font.BOLD, mmToPx(2.4)));
+        g.setColor(Color.BLACK);
+        drawCentered(g, "KALIBRASYON", w, mmToPx(3.0));
+        drawCentered(g, "renkli cikan mm araligi = bant", w, mmToPx(84.5));
+
+        g.dispose();
+        return img;
+    }
+
     private static void drawCentered(Graphics2D g, String text, int w, int baselineY) {
         if (text == null || text.isBlank()) return;
         int tw = g.getFontMetrics().stringWidth(text);
@@ -215,10 +275,11 @@ public class CardRenderer {
         System.out.println("Geçerlilik : " + d.expiryDate);
         System.out.println("Fotoğraf   : " + (d.photo != null ? d.photo : "(yok)"));
 
-        if (PHOTO_H_MM > COLOR_BAND_MAX_MM) {
+        if (PHOTO_Y_MM < BAND_START_MM || PHOTO_Y_MM + PHOTO_H_MM > BAND_END_MM) {
             System.out.println();
-            System.out.println("UYARI: fotoğraf yüksekliği (" + PHOTO_H_MM + " mm) yarım panel"
-                    + " renkli bant sınırını (" + COLOR_BAND_MAX_MM + " mm) aşıyor.");
+            System.out.println("UYARI: fotoğraf (" + PHOTO_Y_MM + "-" + (PHOTO_Y_MM + PHOTO_H_MM)
+                    + " mm) renkli bandın (" + BAND_START_MM + "-" + BAND_END_MM
+                    + " mm) dışına taşıyor — taşan kısım renksiz basılır.");
         }
 
         BufferedImage img = render(d);

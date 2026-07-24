@@ -42,7 +42,7 @@ public class MainUI extends JFrame {
     // Yazıcı tarafı
     private JLabel printerStatus;
     private JTextArea printerInfoArea;
-    private JButton refreshBtn, clearErrBtn, previewBtn, dryRunBtn, printBtn;
+    private JButton refreshBtn, clearErrBtn, previewBtn, dryRunBtn, printBtn, calibBtn;
 
     private JButton reconnectBtn;
     private JTextArea logArea;
@@ -209,18 +209,21 @@ public class MainUI extends JFrame {
         clearErrBtn = new JButton("Hatayı Temizle");
         previewBtn = new JButton("Kart Önizleme Üret");
         dryRunBtn = new JButton("Prova Bas (kart harcamaz)");
+        calibBtn = new JButton("Kalibrasyon Kartı Bas");
         printBtn = bigButton("KART BAS");
 
         refreshBtn.addActionListener(e -> refreshPrinterInfo());
         clearErrBtn.addActionListener(e -> doClearErrors());
         previewBtn.addActionListener(e -> doRenderCard(false));
         dryRunBtn.addActionListener(e -> doPrint(true));
+        calibBtn.addActionListener(e -> doPrintCalibration());
         printBtn.addActionListener(e -> doPrint(false));
 
         buttons.add(refreshBtn);
         buttons.add(clearErrBtn);
         buttons.add(previewBtn);
         buttons.add(dryRunBtn);
+        buttons.add(calibBtn);
         buttons.add(printBtn);
         panel.add(buttons, BorderLayout.SOUTH);
 
@@ -561,10 +564,35 @@ public class MainUI extends JFrame {
     private void doPrint(boolean dryRun) {
         Path bmp = doRenderCard(true);
         if (bmp == null) return;
+        runPrint(bmp, dryRun, "Gerçek baskı yapılacak ve bir kart harcanacak.\nDevam edilsin mi?");
+    }
 
+    /**
+     * Kalibrasyon kartı bas — yarım panel renkli bandın kartın neresine
+     * düştüğünü ölçer. Basılan kartta hangi mm etiketlerinin hizasında renk
+     * çıktıysa bant oradadır; EvolisPrinter.shortPanelShift buna göre ayarlanır.
+     */
+    private void doPrintCalibration() {
+        Path bmp;
+        try {
+            BufferedImage img = CardRenderer.renderCalibration();
+            AppPaths.ensureDir("output");
+            bmp = AppPaths.resolve("output", "card_calibration.bmp");
+            javax.imageio.ImageIO.write(img, "bmp", bmp.toFile());
+            log("Kalibrasyon görseli üretildi: " + bmp);
+        } catch (Exception e) {
+            log("Kalibrasyon görseli üretilemedi: " + e.getMessage());
+            return;
+        }
+        runPrint(bmp, false,
+                "Kalibrasyon kartı basılacak ve bir kart harcanacak.\n\n"
+                + "Baskı bitince kartta RENKLİ çıkan mm aralığını not edin —\n"
+                + "renkli bandın gerçek konumu odur.\n\nDevam edilsin mi?");
+    }
+
+    private void runPrint(Path bmp, boolean dryRun, String confirmText) {
         if (!dryRun) {
-            int answer = JOptionPane.showConfirmDialog(this,
-                    "Gerçek baskı yapılacak ve bir kart harcanacak.\nDevam edilsin mi?",
+            int answer = JOptionPane.showConfirmDialog(this, confirmText,
                     "Baskı onayı", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
             if (answer != JOptionPane.YES_OPTION) {
                 log("Baskı iptal edildi.");
@@ -608,6 +636,7 @@ public class MainUI extends JFrame {
         clearErrBtn.setEnabled(on);
         previewBtn.setEnabled(on);
         dryRunBtn.setEnabled(on);
+        calibBtn.setEnabled(on);
         printBtn.setEnabled(on);
     }
 
