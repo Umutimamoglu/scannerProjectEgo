@@ -42,7 +42,7 @@ public class MainUI extends JFrame {
     // Yazıcı tarafı
     private JLabel printerStatus;
     private JTextArea printerInfoArea;
-    private JButton refreshBtn, clearErrBtn, previewBtn, dryRunBtn, printBtn, calibBtn;
+    private JButton refreshBtn, clearErrBtn, previewBtn, backPreviewBtn, dryRunBtn, printBtn, calibBtn;
 
     private JButton reconnectBtn;
     private JTextArea logArea;
@@ -207,7 +207,8 @@ public class MainUI extends JFrame {
 
         refreshBtn = new JButton("Bilgileri Yenile");
         clearErrBtn = new JButton("Hatayı Temizle");
-        previewBtn = new JButton("Kart Önizleme Üret");
+        previewBtn = new JButton("Ön Yüz Önizle");
+        backPreviewBtn = new JButton("Ön + Arka Önizle");
         dryRunBtn = new JButton("Prova Bas (kart harcamaz)");
         calibBtn = new JButton("Kalibrasyon Kartı Bas");
         printBtn = bigButton("KART BAS");
@@ -215,6 +216,7 @@ public class MainUI extends JFrame {
         refreshBtn.addActionListener(e -> refreshPrinterInfo());
         clearErrBtn.addActionListener(e -> doClearErrors());
         previewBtn.addActionListener(e -> doRenderCard(false));
+        backPreviewBtn.addActionListener(e -> doRenderBoth());
         dryRunBtn.addActionListener(e -> doPrint(true));
         calibBtn.addActionListener(e -> doPrintCalibration());
         printBtn.addActionListener(e -> doPrint(false));
@@ -222,6 +224,7 @@ public class MainUI extends JFrame {
         buttons.add(refreshBtn);
         buttons.add(clearErrBtn);
         buttons.add(previewBtn);
+        buttons.add(backPreviewBtn);
         buttons.add(dryRunBtn);
         buttons.add(calibBtn);
         buttons.add(printBtn);
@@ -551,9 +554,68 @@ public class MainUI extends JFrame {
         }
     }
 
+    /**
+     * Ön ve arka yüzü YAN YANA önizle. Ön yüz taranan kimlikten gelir; kart
+     * taranmamışsa ön yüz boş şablon olarak (başlık + boş alanlar) gösterilir.
+     * Arka yüz statiktir. Kart harcamaz.
+     */
+    private void doRenderBoth() {
+        try {
+            CardRenderer.CardData cd = new CardRenderer.CardData();
+            if (lastData != null) {
+                cd.name = lastData.name;
+                cd.surname = lastData.surname;
+                cd.idNumber = lastData.tcNo;
+                cd.birthDate = lastData.birthDate;
+                cd.expiryDate = lastData.expiryDate;
+                Path photo = AppPaths.resolve("output", "dg2_face_1.png");
+                if (Files.exists(photo)) cd.photo = photo;
+            }
+            BufferedImage front = CardRenderer.render(cd);
+            BufferedImage back = CardRenderer.renderBack();
+            BufferedImage both = sideBySide(front, back, mmToPreviewPx(6));
+
+            AppPaths.ensureDir("output");
+            javax.imageio.ImageIO.write(front, "bmp",
+                    AppPaths.resolve("output", "card_print.bmp").toFile());
+            javax.imageio.ImageIO.write(back, "bmp",
+                    AppPaths.resolve("output", "card_back_print.bmp").toFile());
+            javax.imageio.ImageIO.write(both, "png",
+                    AppPaths.resolve("output", "card_both_preview.png").toFile());
+            log("Ön+Arka önizleme üretildi"
+                    + (lastData == null ? " (ön yüz boş — henüz kart taranmadı)" : ""));
+            showPreviewDialog(both, 820, 660);
+        } catch (Exception e) {
+            log("Önizleme üretilemedi: " + e.getMessage());
+        }
+    }
+
+    /** İki kart görselini gri zemin üstünde yan yana birleştirir. */
+    private static BufferedImage sideBySide(BufferedImage a, BufferedImage b, int gap) {
+        int w = a.getWidth() + gap + b.getWidth();
+        int h = Math.max(a.getHeight(), b.getHeight());
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = out.createGraphics();
+        g.setColor(new Color(0xDDDDDD));
+        g.fillRect(0, 0, w, h);
+        g.drawImage(a, 0, 0, null);
+        g.drawImage(b, a.getWidth() + gap, 0, null);
+        g.dispose();
+        return out;
+    }
+
+    /** Önizleme birleştirmesinde kullanılan boşluk (kart 300 DPI ölçeğinde). */
+    private static int mmToPreviewPx(double mm) {
+        return (int) Math.round(mm / 25.4 * CardRenderer.DPI);
+    }
+
     private void showPreviewDialog(BufferedImage img) {
+        showPreviewDialog(img, 400, 640);
+    }
+
+    private void showPreviewDialog(BufferedImage img, int maxW, int maxH) {
         JDialog dlg = new JDialog(this, "Kart Önizleme", true);
-        JLabel lbl = new JLabel(new ImageIcon(scaleToFit(img, 400, 640)));
+        JLabel lbl = new JLabel(new ImageIcon(scaleToFit(img, maxW, maxH)));
         lbl.setBorder(new EmptyBorder(10, 10, 10, 10));
         dlg.add(lbl);
         dlg.pack();
@@ -561,37 +623,82 @@ public class MainUI extends JFrame {
         dlg.setVisible(true);
     }
 
+    /** ÇİFT YÜZ baskı: taranan kimliğin ön yüzü + statik arka yüz tek işte. */
     private void doPrint(boolean dryRun) {
-        Path bmp = doRenderCard(true);
-        if (bmp == null) return;
-        runPrint(bmp, dryRun, "Gerçek baskı yapılacak ve bir kart harcanacak.\nDevam edilsin mi?");
+        if (lastData == null) {
+            JOptionPane.showMessageDialog(this,
+                    "Önce bir kimlik kartı okutun.", "Veri yok", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        Path[] faces = renderFacesToBmp();
+        if (faces == null) return;
+        Path front = faces[0], back = faces[1];
+        runPrintJob(!dryRun,
+                "Gerçek ÇİFT YÜZ baskı yapılacak ve bir kart harcanacak.\n"
+                + "Ön: kimlik  •  Arka: EGO tasarımı\n\nDevam edilsin mi?",
+                dryRun ? "Çift yüz prova başlatıldı..." : "Çift yüz baskı başlatıldı...",
+                () -> printer.printDuplex(front, back, dryRun));
+    }
+
+    /** Ön (kimlik) ve arka (statik) yüzü BMP'ye yazar, yollarını döndürür. */
+    private Path[] renderFacesToBmp() {
+        try {
+            CardRenderer.CardData cd = new CardRenderer.CardData();
+            cd.name = lastData.name;
+            cd.surname = lastData.surname;
+            cd.idNumber = lastData.tcNo;
+            cd.birthDate = lastData.birthDate;
+            cd.expiryDate = lastData.expiryDate;
+            Path photo = AppPaths.resolve("output", "dg2_face_1.png");
+            if (Files.exists(photo)) cd.photo = photo;
+
+            AppPaths.ensureDir("output");
+            Path front = AppPaths.resolve("output", "card_print.bmp");
+            Path back = AppPaths.resolve("output", "card_back_print.bmp");
+            javax.imageio.ImageIO.write(CardRenderer.render(cd), "bmp", front.toFile());
+            // Baskıda arka yüz 180° döndürülür — kart çevrilince düz+renkli okunsun
+            javax.imageio.ImageIO.write(CardRenderer.renderBackForPrint(), "bmp", back.toFile());
+            return new Path[]{front, back};
+        } catch (Exception e) {
+            log("Görsel üretilemedi: " + e.getMessage());
+            return null;
+        }
     }
 
     /**
-     * Kalibrasyon kartı bas — yarım panel renkli bandın kartın neresine
-     * düştüğünü ölçer. Basılan kartta hangi mm etiketlerinin hizasında renk
-     * çıktıysa bant oradadır; EvolisPrinter.shortPanelShift buna göre ayarlanır.
+     * ÇİFT YÜZ kalibrasyon kartı bas — tek kartta hem ön hem arka bandın nereye
+     * düştüğünü, hem de arka yüzün ters/düz mü çıktığını (ÜST/ALT işaretleri)
+     * gösterir. Sonuca göre EvolisPrinter.shortPanelShift / CardRenderer.backRotate180
+     * ayarlanır.
      */
     private void doPrintCalibration() {
-        Path bmp;
+        Path front, back;
         try {
-            BufferedImage img = CardRenderer.renderCalibration();
             AppPaths.ensureDir("output");
-            bmp = AppPaths.resolve("output", "card_calibration.bmp");
-            javax.imageio.ImageIO.write(img, "bmp", bmp.toFile());
-            log("Kalibrasyon görseli üretildi: " + bmp);
+            front = AppPaths.resolve("output", "card_calibration.bmp");
+            back = AppPaths.resolve("output", "card_calibration_back.bmp");
+            javax.imageio.ImageIO.write(CardRenderer.renderCalibration(), "bmp", front.toFile());
+            javax.imageio.ImageIO.write(CardRenderer.renderCalibrationBack(), "bmp", back.toFile());
+            log("Çift yüz kalibrasyon görselleri üretildi.");
         } catch (Exception e) {
             log("Kalibrasyon görseli üretilemedi: " + e.getMessage());
             return;
         }
-        runPrint(bmp, false,
-                "Kalibrasyon kartı basılacak ve bir kart harcanacak.\n\n"
-                + "Baskı bitince kartta RENKLİ çıkan mm aralığını not edin —\n"
-                + "renkli bandın gerçek konumu odur.\n\nDevam edilsin mi?");
+        runPrintJob(true,
+                "Çift yüz KALİBRASYON kartı basılacak ve bir kart harcanacak.\n\n"
+                + "Baskı bitince NOT ET:\n"
+                + "• Ön yüzde RENKLİ çıkan mm aralığı\n"
+                + "• Arka yüzde RENKLİ çıkan mm aralığı\n"
+                + "• Arka yüzde 'ARKA UST ^' yazısı üstte mi altta mı\n\n"
+                + "Devam edilsin mi?",
+                "Kalibrasyon baskısı başlatıldı...",
+                () -> printer.printDuplex(front, back, false));
     }
 
-    private void runPrint(Path bmp, boolean dryRun, String confirmText) {
-        if (!dryRun) {
+    /** Onay + arka planda baskı + sonuç bildirimi (tek/çift yüz için ortak). */
+    private void runPrintJob(boolean confirm, String confirmText, String startLog,
+                             java.util.function.Supplier<EvolisPrinter.PrintResult> job) {
+        if (confirm) {
             int answer = JOptionPane.showConfirmDialog(this, confirmText,
                     "Baskı onayı", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
             if (answer != JOptionPane.YES_OPTION) {
@@ -601,11 +708,11 @@ public class MainUI extends JFrame {
         }
 
         setPrinterButtonsEnabled(false);
-        log(dryRun ? "Prova başlatıldı..." : "Baskı başlatıldı...");
+        log(startLog);
 
         new SwingWorker<EvolisPrinter.PrintResult, Void>() {
             @Override protected EvolisPrinter.PrintResult doInBackground() {
-                return printer.print(bmp, dryRun);
+                return job.get();
             }
 
             @Override protected void done() {
@@ -635,6 +742,7 @@ public class MainUI extends JFrame {
         refreshBtn.setEnabled(on);
         clearErrBtn.setEnabled(on);
         previewBtn.setEnabled(on);
+        backPreviewBtn.setEnabled(on);
         dryRunBtn.setEnabled(on);
         calibBtn.setEnabled(on);
         printBtn.setEnabled(on);

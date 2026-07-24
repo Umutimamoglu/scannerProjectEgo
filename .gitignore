@@ -38,3 +38,8 @@ Thumbs.db
 # Geçici dönüşüm dosyaları
 src/protocol_full.txt
 src/CRT_591_MRXX_Protocol*.pdf
+
+# Logoların ham hâlleri kök dizine bırakıldı; kullanılan temiz kopyalar assets/ içinde
+EGO_Genel_Müdürlüğü_logo.png
+ankara-buyuksehir-belediyesi-logo-png_seeklogo-260961.png
+native_x64/head.jpg

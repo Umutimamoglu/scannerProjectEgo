@@ -59,6 +59,7 @@ echo [4/4] Native kutuphaneler ve kaynaklar kopyalaniyor...
 REM Bunlar exe'nin YANINDA olmali - AppPaths kok dizini exe konumundan cozuyor.
 xcopy /e /i /y /q "%~dp0native_x64"    "%DIST%\%APPNAME%\native_x64"    >nul
 xcopy /e /i /y /q "%~dp0native_evolis" "%DIST%\%APPNAME%\native_evolis" >nul
+xcopy /e /i /y /q "%~dp0assets"        "%DIST%\%APPNAME%\assets"        >nul
 if exist "%~dp0config.ini" copy /y "%~dp0config.ini" "%DIST%\%APPNAME%\config.ini" >nul
 
 REM Calisma klasorleri

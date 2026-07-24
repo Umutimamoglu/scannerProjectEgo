@@ -152,6 +152,236 @@ public class CardRenderer {
         return img;
     }
 
+    // === Arka yüz ===
+
+    /** EGO kurumsal kırmızısı ve Ankara arması lacivertine yakın tonlar. */
+    static final Color EGO_RED = new Color(227, 6, 19);
+    static final Color ANKARA_BLUE = new Color(20, 60, 140);
+
+    static final String[] BACK_TERMS = {
+        "Bu kart EGO Genel Müdürlüğü mülkiyetindedir.",
+        "İzinsiz kullananlar hakkında yasal işlem yapılır.",
+        "Bulduğunuz kartları en yakın EGO otobüsüne veya gişesine teslim ediniz.",
+        "Kartınızı bükmeyiniz, delmeyiniz ve manyetik alanlardan uzak tutunuz.",
+        "Kart kullanım koşulları www.ego.gov.tr adresinde yer almaktadır.",
+    };
+
+    /** Arka yüz kart numarası — statik (kullanıcı onayı: sabit 4x4 sıfır). */
+    static String BACK_CARD_NUMBER = "0000 0000 0000 0000";
+
+    /**
+     * Arka görseli 180° döndür. Çift yüz baskıda yazıcı kartı fiziksel çevirir;
+     * arka ters çıkıyorsa bu bayrakla yazılımda düzeltiriz. Kalibrasyonla belirlenir.
+     */
+    static boolean backRotate180 = false;
+
+    /**
+     * Kartın ARKA yüzünü üretir.
+     *
+     * Üst ~33 mm renkli (logolar + slogan + ulaşım ikonları) — renkli banda
+     * denk gelmeli. Alt kısım saf siyah (koşullar + kart no) — K paneli basar,
+     * konum kısıtı yok. Bandın arkada nereye düştüğü kalibrasyonla doğrulanacak.
+     */
+    public static BufferedImage renderBack() throws Exception {
+        int w = mmToPx(CARD_W_MM);
+        int h = mmToPx(CARD_H_MM);
+
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, w, h);
+
+        // OKUMA GÖRÜNÜMÜ (şablon düzeni): logolar ÜSTTE, maddeler altta.
+        // Baskıya giderken renderBackForPrint() bunu 180° döndürür; böylece renkli
+        // üst blok fiziksel alt banda oturur, kullanıcı kartı çevirince düz+renkli okur.
+        int lx = mmToPx(4.0);
+
+        // --- RENKLİ ÜST BÖLGE (döndürülünce alt banda oturar) ---
+        // EGO logosu (sol) — yatay, oran korunur
+        drawLogoFit(g, AppPaths.resolve("assets", "logo_ego.png"),
+                mmToPx(4.0), mmToPx(7.0), mmToPx(26.0), mmToPx(13.0), false);
+        // Ankara arması (sağ) — dikey, kutuya sığdır
+        drawLogoFit(g, AppPaths.resolve("assets", "logo_ankara.png"),
+                mmToPx(38.0), mmToPx(6.5), mmToPx(12.0), mmToPx(13.5), true);
+
+        // Slogan
+        g.setFont(new Font("Arial", Font.PLAIN, mmToPx(2.7)));
+        g.setColor(new Color(90, 90, 90));
+        g.drawString("Güvenli Yolculuk,", lx, mmToPx(26.0));
+        g.setFont(new Font("Arial", Font.BOLD, mmToPx(3.0)));
+        g.setColor(EGO_RED);
+        g.drawString("Güzel Ankara.", lx, mmToPx(30.0));
+
+        // Ulaşım ikon şeridi (kırmızı) — YER TUTUCU
+        drawTransitStrip(g, lx, mmToPx(32.5), mmToPx(4.2), 5);
+
+        // Ayraç çizgisi
+        g.setColor(new Color(200, 200, 200));
+        g.setStroke(new BasicStroke(Math.max(1, mmToPx(0.2))));
+        g.drawLine(mmToPx(4.0), mmToPx(40.0), w - mmToPx(4.0), mmToPx(40.0));
+
+        // --- SİYAH ALT BÖLGE (koşullar) — K paneli, konum serbest ---
+        // BOLD: resin K panelinin daha çok temas etmesi için (silik baskıya karşı).
+        double ty = 44.0;
+        double lineMm = 2.6;
+        for (int i = 0; i < BACK_TERMS.length; i++) {
+            drawTermIcon(g, i, mmToPx(4.0), mmToPx(ty - 3.0), mmToPx(4.4));
+            g.setFont(new Font("Arial", Font.BOLD, mmToPx(2.2)));
+            g.setColor(Color.BLACK);
+            int lines = drawWrapped(g, BACK_TERMS[i],
+                    mmToPx(11.0), mmToPx(ty), mmToPx(CARD_W_MM - 11.0 - 3.0), mmToPx(lineMm));
+            ty += lines * lineMm + 1.6;
+        }
+
+        // Kart numarası (siyah, ortalı, en altta)
+        g.setColor(Color.BLACK);
+        g.setFont(new Font("Consolas", Font.BOLD, mmToPx(3.0)));
+        drawCentered(g, BACK_CARD_NUMBER, w, mmToPx(83.5));
+
+        g.dispose();
+        return img;
+    }
+
+    /**
+     * Arka yüzün BASKI hâli — okuma görünümünün 180° döndürülmüşü.
+     *
+     * Renkli üst blok, döndürülünce fiziksel alt banda (BAND_START..END) oturur;
+     * yazıcı arka görseli olduğu gibi bastığı için, kullanıcı kartı çevirince
+     * tasarım düz ve logolar renkli okunur. (Çevirme yönü kalibrasyonla doğrulandı.)
+     */
+    public static BufferedImage renderBackForPrint() throws Exception {
+        return rotate180(renderBack());
+    }
+
+    /** Görseli 180° döndürür (çift yüz arka yön düzeltmesi). */
+    static BufferedImage rotate180(BufferedImage src) {
+        BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(), src.getType());
+        Graphics2D g = out.createGraphics();
+        g.rotate(Math.PI, src.getWidth() / 2.0, src.getHeight() / 2.0);
+        g.drawImage(src, 0, 0, null);
+        g.dispose();
+        return out;
+    }
+
+    /**
+     * Arka yüz kalibrasyon hedefi: renkli mm cetveli + büyük yön işareti.
+     * Çift yüz baskıda arka yüzün (a) renkli bandı nereye düştüğünü,
+     * (b) ters/düz mü çıktığını tek kartta gösterir.
+     */
+    public static BufferedImage renderCalibrationBack() {
+        BufferedImage img = renderCalibration();
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setColor(Color.BLACK);
+        // Üstte büyük "ARKA ÜST ^", altta "ALT" — yön belirsizliği kalmasın
+        g.setFont(new Font("Arial", Font.BOLD, mmToPx(4.0)));
+        drawCentered(g, "ARKA UST ^", mmToPx(CARD_W_MM), mmToPx(7.5));
+        g.setFont(new Font("Arial", Font.BOLD, mmToPx(3.0)));
+        drawCentered(g, "ALT", mmToPx(CARD_W_MM), mmToPx(80.0));
+        g.dispose();
+        return backRotate180 ? rotate180(img) : img;
+    }
+
+    /** Saydam PNG'yi kutuya oranını koruyarak sığdırır; kutuda ortalar. */
+    private static void drawLogoFit(Graphics2D g, Path logo, int bx, int by, int bw, int bh,
+                                    boolean center) {
+        try {
+            if (!Files.exists(logo)) return;
+            BufferedImage im = ImageIO.read(logo.toFile());
+            if (im == null) return;
+            double scale = Math.min((double) bw / im.getWidth(), (double) bh / im.getHeight());
+            int dw = (int) Math.round(im.getWidth() * scale);
+            int dh = (int) Math.round(im.getHeight() * scale);
+            int dx = center ? bx + (bw - dw) / 2 : bx;
+            int dy = by + (bh - dh) / 2;
+            g.drawImage(im, dx, dy, dw, dh, null); // alfa korunur, beyaz kutu çıkmaz
+        } catch (Exception ignore) {
+        }
+    }
+
+    /** Metni verilen genişliğe sarar; kullanılan satır sayısını döndürür. */
+    private static int drawWrapped(Graphics2D g, String text, int x, int yBaseline,
+                                   int maxW, int lineH) {
+        String[] words = text.split(" ");
+        StringBuilder line = new StringBuilder();
+        int y = yBaseline, lines = 0;
+        for (String word : words) {
+            String test = line.length() == 0 ? word : line + " " + word;
+            if (g.getFontMetrics().stringWidth(test) > maxW && line.length() > 0) {
+                g.drawString(line.toString(), x, y);
+                line = new StringBuilder(word);
+                y += lineH;
+                lines++;
+            } else {
+                line = new StringBuilder(test);
+            }
+        }
+        if (line.length() > 0) { g.drawString(line.toString(), x, y); lines++; }
+        return lines;
+    }
+
+    /** Kırmızı ulaşım ikon şeridi — basit yer tutucu otobüs simgeleri. */
+    private static void drawTransitStrip(Graphics2D g, int x, int yTop, int d, int n) {
+        int gap = mmToPx(1.4);
+        for (int i = 0; i < n; i++) {
+            int cx = x + i * (d + gap);
+            g.setColor(EGO_RED);
+            g.fillOval(cx, yTop, d, d);
+            // beyaz otobüs silueti
+            g.setColor(Color.WHITE);
+            int bw = (int) (d * 0.55), bh = (int) (d * 0.38);
+            int bx = cx + (d - bw) / 2, by = yTop + (d - bh) / 2;
+            g.fillRoundRect(bx, by, bw, bh, bh / 2, bh / 2);
+            g.setColor(EGO_RED);
+            g.fillOval(bx + bw / 6, by + bh - bh / 5, bh / 3, bh / 3);
+            g.fillOval(bx + bw - bw / 6 - bh / 3, by + bh - bh / 5, bh / 3, bh / 3);
+        }
+    }
+
+    /** 5 koşul maddesi için basit siyah çizgi ikonlar (yer tutucu). */
+    private static void drawTermIcon(Graphics2D g, int idx, int x, int y, int s) {
+        g.setColor(Color.BLACK);
+        g.setStroke(new BasicStroke(Math.max(2, mmToPx(0.4))));  // kalın: silik baskıya karşı
+        switch (idx) {
+            case 0: // belge/kart
+                g.drawRoundRect(x, y, s, s, s / 5, s / 5);
+                for (int i = 1; i <= 3; i++)
+                    g.drawLine(x + s / 5, y + i * s / 4, x + s - s / 5, y + i * s / 4);
+                break;
+            case 1: // yasal (§)
+                g.setFont(new Font("Serif", Font.BOLD, s));
+                g.drawString("§", x + s / 4, y + s);
+                break;
+            case 2: // teslim (kutuya ok)
+                g.drawRect(x, y + s / 3, s, s - s / 3);
+                g.drawLine(x + s / 2, y, x + s / 2, y + s / 2);
+                g.drawLine(x + s / 2 - s / 4, y + s / 4, x + s / 2, y + s / 2);
+                g.drawLine(x + s / 2 + s / 4, y + s / 4, x + s / 2, y + s / 2);
+                break;
+            case 3: // bükme yok (kart + yasak)
+                g.drawRoundRect(x, y + s / 4, s, s / 2, s / 6, s / 6);
+                g.drawOval(x + s / 4, y, s, s);
+                g.drawLine(x + s / 4, y + s, x + s / 4 + s, y);
+                break;
+            default: // web (dünya)
+                g.drawOval(x, y, s, s);
+                g.drawOval(x + s / 3, y, s / 3, s);
+                g.drawLine(x, y + s / 2, x + s, y + s / 2);
+                break;
+        }
+    }
+
+    /** Rakamların arasını hafifçe açar (kart no görünümü). */
+    private static String spaced(String s) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : s.toCharArray()) { sb.append(c); sb.append(c == ' ' ? "  " : " "); }
+        return sb.toString();
+    }
+
     /**
      * Kalibrasyon hedefi — yarım panel renkli bandın kartın neresine düştüğünü ölçer.
      *

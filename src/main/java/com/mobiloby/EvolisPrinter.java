@@ -255,6 +255,60 @@ public class EvolisPrinter implements AutoCloseable {
         return new PrintResult(false, rc, "Baskı başarısız: " + returnCodeName(rc));
     }
 
+    /**
+     * Çift yüz çevirme ekseni — GDuplexType. NONE=tek yüz, HORIZONTAL/VERTICAL
+     * çevirme yönünü belirler. Hangisinin doğru olduğu kalibrasyonla saptanır.
+     */
+    public static String duplexType = "HORIZONTAL";
+
+    /**
+     * Kartın ÖN ve ARKA yüzünü tek işte bas (çift yüz).
+     *
+     * Yazıcı kartı fiziksel olarak çevirir; biz iki görsel veririz. Arka görselin
+     * yönü (ters/ayna) duplexType eksenine bağlı — gerçek baskıdan önce
+     * kalibrasyon kartıyla doğrulanmalı.
+     */
+    public PrintResult printDuplex(Path front, Path back, boolean dryRun) {
+        if (ctx == null) return new PrintResult(false, 0, "Yazıcı bağlı değil");
+        if (!Files.exists(front)) return new PrintResult(false, 0, "Ön görsel yok: " + front);
+        if (!Files.exists(back)) return new PrintResult(false, 0, "Arka görsel yok: " + back);
+
+        State s = readState();
+        if (s.hasError) {
+            return new PrintResult(false, 0,
+                    "Yazıcıda hata var, önce temizleyin: " + String.join(", ", s.flags));
+        }
+
+        int rc = lib.evolis_print_init(ctx);
+        if (rc != EvolisSDK.Ret.OK) return new PrintResult(false, rc, "print_init başarısız");
+
+        lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.ORIENTATION, "PORTRAIT");
+        lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.G_SHORT_PANEL_MANAGEMENT, shortPanelMode);
+        if ("CUSTOM".equals(shortPanelMode)) {
+            lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.I_SHORT_PANEL_SHIFT,
+                    String.valueOf(shortPanelShift));
+        }
+        lib.evolis_print_set_setting(ctx, EvolisSDK.SettingKey.G_DUPLEX_TYPE, duplexType);
+
+        rc = lib.evolis_print_set_imagep(ctx, EvolisSDK.CardFace.FRONT, front.toAbsolutePath().toString());
+        if (rc != EvolisSDK.Ret.OK) return new PrintResult(false, rc, "Ön görsel yüklenemedi");
+        rc = lib.evolis_print_set_imagep(ctx, EvolisSDK.CardFace.BACK, back.toAbsolutePath().toString());
+        if (rc != EvolisSDK.Ret.OK) return new PrintResult(false, rc, "Arka görsel yüklenemedi");
+
+        if (dryRun) {
+            Path prn = AppPaths.resolve("output", "card_duplex_dryrun.prn").toAbsolutePath();
+            rc = lib.evolis_print_to_file(ctx, prn.toString());
+            return rc == EvolisSDK.Ret.OK
+                    ? new PrintResult(true, rc, "Çift yüz prova başarılı — kart harcanmadı (" + prn.getFileName() + ")")
+                    : new PrintResult(false, rc, "Çift yüz prova başarısız: " + returnCodeName(rc));
+        }
+
+        rc = lib.evolis_print_exect(ctx, PRINT_TIMEOUT_MS);
+        return rc == EvolisSDK.Ret.OK
+                ? new PrintResult(true, rc, "Çift yüz baskı tamamlandı")
+                : new PrintResult(false, rc, "Çift yüz baskı başarısız: " + returnCodeName(rc));
+    }
+
     /** Sık karşılaşılan dönüş kodlarının okunabilir karşılığı. */
     public static String returnCodeName(int rc) {
         switch (rc) {
