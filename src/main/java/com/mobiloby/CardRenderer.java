@@ -154,9 +154,10 @@ public class CardRenderer {
 
     // === Arka yüz ===
 
-    /** EGO kurumsal kırmızısı ve Ankara arması lacivertine yakın tonlar. */
+    /** EGO kurumsal kırmızısı, Ankara arması lacivertine yakın ton ve ulaşım mavisi. */
     static final Color EGO_RED = new Color(227, 6, 19);
     static final Color ANKARA_BLUE = new Color(20, 60, 140);
+    static final Color TRANSIT_BLUE = new Color(0, 95, 175);
 
     static final String[] BACK_TERMS = {
         "Bu kart EGO Genel Müdürlüğü mülkiyetindedir.",
@@ -195,6 +196,10 @@ public class CardRenderer {
         g.setColor(Color.WHITE);
         g.fillRect(0, 0, w, h);
 
+        // Dekoratif üst zemin — açık mavi low-poly mesh + soluk kırmızı EGO motifi.
+        // Yalnızca üst ~42 mm'ye çizilir; 180° döndürülünce renkli banda oturur.
+        drawHeaderPattern(g, w, 0.0, 42.0);
+
         // OKUMA GÖRÜNÜMÜ (şablon düzeni): logolar ÜSTTE, maddeler altta.
         // Baskıya giderken renderBackForPrint() bunu 180° döndürür; böylece renkli
         // üst blok fiziksel alt banda oturur, kullanıcı kartı çevirince düz+renkli okur.
@@ -216,8 +221,8 @@ public class CardRenderer {
         g.setColor(EGO_RED);
         g.drawString("Güzel Ankara.", lx, mmToPx(30.0));
 
-        // Ulaşım ikon şeridi (kırmızı) — YER TUTUCU
-        drawTransitStrip(g, lx, mmToPx(32.5), mmToPx(4.2), 5);
+        // Ulaşım şeridi — kırmızı/mavi otobüs ve tren
+        drawTransitStrip(g, lx, mmToPx(32.5), mmToPx(4.6));
 
         // Ayraç çizgisi
         g.setColor(new Color(200, 200, 200));
@@ -324,54 +329,187 @@ public class CardRenderer {
         return lines;
     }
 
-    /** Kırmızı ulaşım ikon şeridi — basit yer tutucu otobüs simgeleri. */
-    private static void drawTransitStrip(Graphics2D g, int x, int yTop, int d, int n) {
-        int gap = mmToPx(1.4);
-        for (int i = 0; i < n; i++) {
+    /**
+     * Dekoratif üst zemin: açık mavi low-poly üçgen mesh (sola doğru yoğun,
+     * sağa doğru saydam) + sağ tarafta soluk kırmızı ışınsal EGO motifi.
+     * Sadece [topMm, botMm] aralığına çizilir (döndürülünce renkli banda gelir).
+     */
+    private static void drawHeaderPattern(Graphics2D g, int w, double topMm, double botMm) {
+        int y0 = mmToPx(topMm), y1 = mmToPx(botMm);
+        java.awt.Shape oldClip = g.getClip();
+        g.setClip(0, y0, w, y1 - y0);
+        java.util.Random rnd = new java.util.Random(7);
+
+        // --- açık mavi low-poly mesh ---
+        int cols = 8, rows = 4;
+        double cw = (double) w / cols, ch = (double) (y1 - y0) / rows;
+        java.awt.geom.Point2D.Double[][] p = new java.awt.geom.Point2D.Double[rows + 1][cols + 1];
+        for (int r = 0; r <= rows; r++)
+            for (int c = 0; c <= cols; c++) {
+                double jx = (c == 0 || c == cols) ? 0 : (rnd.nextDouble() - 0.5) * cw * 0.55;
+                double jy = (r == 0 || r == rows) ? 0 : (rnd.nextDouble() - 0.5) * ch * 0.55;
+                p[r][c] = new java.awt.geom.Point2D.Double(c * cw + jx, y0 + r * ch + jy);
+            }
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++) {
+                int a1 = meshAlpha(c, cols, rnd), a2 = meshAlpha(c, cols, rnd);
+                fillTri(g, p[r][c], p[r][c + 1], p[r + 1][c], new Color(200, 219, 244, a1));
+                fillTri(g, p[r + 1][c], p[r][c + 1], p[r + 1][c + 1], new Color(200, 219, 244, a2));
+            }
+
+        // --- soluk kırmızı ışınsal motif (sağ) ---
+        g.setColor(new Color(228, 110, 120, 42));
+        g.setStroke(new BasicStroke(Math.max(1f, mmToPx(0.12))));
+        double mx = w - mmToPx(3), my = y0 + (y1 - y0) * 0.42, rr = mmToPx(19);
+        for (int i = 0; i <= 18; i++) {
+            double ang = Math.PI * (0.15 + 0.9 * i / 18.0);
+            g.draw(new java.awt.geom.Line2D.Double(mx, my,
+                    mx - Math.cos(ang) * rr, my - Math.sin(ang) * rr));
+        }
+        for (int k = 1; k <= 3; k++) {
+            double kr = rr * k / 3.0;
+            g.draw(new java.awt.geom.Ellipse2D.Double(mx - kr, my - kr, kr * 2, kr * 2));
+        }
+
+        g.setClip(oldClip);
+    }
+
+    /** Mesh üçgeni için sola doğru yoğun, sağa doğru saydam mavi alfa. */
+    private static int meshAlpha(int c, int cols, java.util.Random rnd) {
+        double t = 1.0 - (double) c / cols;          // sol=1, sağ=0
+        return (int) Math.max(0, Math.min(150, 150 * t * t + rnd.nextInt(18) - 9));
+    }
+
+    /** Üç noktalı üçgeni doldurur + saydam beyaz kenar (faset görünümü). */
+    private static void fillTri(Graphics2D g, java.awt.geom.Point2D a,
+                                java.awt.geom.Point2D b, java.awt.geom.Point2D c, Color col) {
+        java.awt.geom.Path2D.Double t = new java.awt.geom.Path2D.Double();
+        t.moveTo(a.getX(), a.getY());
+        t.lineTo(b.getX(), b.getY());
+        t.lineTo(c.getX(), c.getY());
+        t.closePath();
+        g.setColor(col);
+        g.fill(t);
+        g.setColor(new Color(255, 255, 255, 90));
+        g.setStroke(new BasicStroke(1f));
+        g.draw(t);
+    }
+
+    /** Ulaşım şeridi — 4 ikon: kırmızı otobüs, mavi otobüs, kırmızı metro, mavi metro. */
+    private static void drawTransitStrip(Graphics2D g, int x, int yTop, int d) {
+        Color[] col = {EGO_RED, TRANSIT_BLUE, EGO_RED, TRANSIT_BLUE};
+        boolean[] metro = {false, false, true, true};
+        int gap = mmToPx(2.4);
+        java.awt.Stroke old = g.getStroke();
+        g.setStroke(new BasicStroke(Math.max(1.5f, d * 0.05f),
+                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        for (int i = 0; i < 4; i++) {
             int cx = x + i * (d + gap);
-            g.setColor(EGO_RED);
+            g.setColor(col[i]);
             g.fillOval(cx, yTop, d, d);
-            // beyaz otobüs silueti
+            drawVehicleSide(g, cx, yTop, d, metro[i], col[i]);
+        }
+        g.setStroke(old);
+    }
+
+    /**
+     * Daire içine beyaz araç. metro=true → ÖNDEN görünüm metro (yuvarlak tavan + cam + far);
+     * false → yandan görünüm otobüs (yuvarlak tekerlekli). cut = daire rengi (oyuk).
+     */
+    private static void drawVehicleSide(Graphics2D g, int ox, int oy, int d,
+                                        boolean metro, Color cut) {
+        if (metro) {
+            // Metro — önden görünüm: yuvarlak tavanlı gövde + geniş cam + 2 far
+            double bw = d * 0.44, bh = d * 0.58;
+            double bx = ox + (d - bw) / 2.0, by = oy + d * 0.21;
             g.setColor(Color.WHITE);
-            int bw = (int) (d * 0.55), bh = (int) (d * 0.38);
-            int bx = cx + (d - bw) / 2, by = yTop + (d - bh) / 2;
-            g.fillRoundRect(bx, by, bw, bh, bh / 2, bh / 2);
-            g.setColor(EGO_RED);
-            g.fillOval(bx + bw / 6, by + bh - bh / 5, bh / 3, bh / 3);
-            g.fillOval(bx + bw - bw / 6 - bh / 3, by + bh - bh / 5, bh / 3, bh / 3);
+            g.fill(new java.awt.geom.RoundRectangle2D.Double(bx, by, bw, bh, bw * 0.6, bw * 0.6));
+            // alt köşeleri düz olsun (tavan yuvarlak, taban düz)
+            g.fill(new java.awt.geom.Rectangle2D.Double(bx, by + bh * 0.5, bw, bh * 0.5));
+            g.setColor(cut);
+            // ön cam (geniş üst pencere)
+            g.fill(new java.awt.geom.RoundRectangle2D.Double(bx + bw * 0.15, by + bh * 0.15,
+                    bw * 0.70, bh * 0.32, bw * 0.22, bw * 0.22));
+            // 2 far
+            double lr = bw * 0.22;
+            g.fill(new java.awt.geom.Ellipse2D.Double(bx + bw * 0.14, by + bh * 0.62, lr, lr));
+            g.fill(new java.awt.geom.Ellipse2D.Double(bx + bw * 0.64, by + bh * 0.62, lr, lr));
+            // peron/ray çizgisi
+            g.setColor(Color.WHITE);
+            g.draw(new java.awt.geom.Line2D.Double(ox + d * 0.16, oy + d * 0.86, ox + d * 0.84, oy + d * 0.86));
+        } else {
+            // Otobüs: dörtgen gövde + pencere şeridi + 2 yuvarlak tekerlek
+            double bx = ox + d * 0.17, by = oy + d * 0.33, bw = d * 0.66, bh = d * 0.30;
+            g.setColor(Color.WHITE);
+            g.fill(new java.awt.geom.RoundRectangle2D.Double(bx, by, bw, bh, bh * 0.4, bh * 0.4));
+            g.setColor(cut);
+            g.fill(new java.awt.geom.RoundRectangle2D.Double(bx + bw * 0.12, by + bh * 0.15,
+                    bw * 0.76, bh * 0.34, bh * 0.2, bh * 0.2));
+            double wr = d * 0.12, wy = by + bh - wr * 0.35;
+            g.setColor(Color.WHITE);
+            g.fill(new java.awt.geom.Ellipse2D.Double(bx + bw * 0.14, wy, wr, wr));
+            g.fill(new java.awt.geom.Ellipse2D.Double(bx + bw * 0.66, wy, wr, wr));
+            g.setColor(cut);
+            g.fill(new java.awt.geom.Ellipse2D.Double(bx + bw * 0.14 + wr * 0.33, wy + wr * 0.33, wr * 0.34, wr * 0.34));
+            g.fill(new java.awt.geom.Ellipse2D.Double(bx + bw * 0.66 + wr * 0.33, wy + wr * 0.33, wr * 0.34, wr * 0.34));
         }
     }
 
-    /** 5 koşul maddesi için basit siyah çizgi ikonlar (yer tutucu). */
+    /** 5 koşul maddesi için temiz siyah çizgi ikonlar. */
     private static void drawTermIcon(Graphics2D g, int idx, int x, int y, int s) {
         g.setColor(Color.BLACK);
-        g.setStroke(new BasicStroke(Math.max(2, mmToPx(0.4))));  // kalın: silik baskıya karşı
+        g.setStroke(new BasicStroke(Math.max(2, mmToPx(0.35)),
+                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         switch (idx) {
-            case 0: // belge/kart
-                g.drawRoundRect(x, y, s, s, s / 5, s / 5);
-                for (int i = 1; i <= 3; i++)
-                    g.drawLine(x + s / 5, y + i * s / 4, x + s - s / 5, y + i * s / 4);
+            case 0: { // mülkiyet: köşesi kıvrık belge + satırlar
+                int f = s / 4;
+                java.awt.Polygon doc = new java.awt.Polygon();
+                doc.addPoint(x, y); doc.addPoint(x + s - f, y);
+                doc.addPoint(x + s, y + f); doc.addPoint(x + s, y + s);
+                doc.addPoint(x, y + s);
+                g.drawPolygon(doc);
+                g.drawLine(x + s - f, y, x + s - f, y + f);
+                g.drawLine(x + s - f, y + f, x + s, y + f);
+                for (int i = 2; i <= 4; i++)
+                    g.drawLine(x + s / 5, y + i * s / 6, x + s - s / 5, y + i * s / 6);
                 break;
-            case 1: // yasal (§)
-                g.setFont(new Font("Serif", Font.BOLD, s));
-                g.drawString("§", x + s / 4, y + s);
+            }
+            case 1: { // yasal: terazi
+                int cx = x + s / 2;
+                g.drawLine(cx, y, cx, y + s);                 // direk
+                g.drawLine(x, y + s / 5, x + s, y + s / 5);   // kiriş
+                g.drawLine(x, y + s, x + s, y + s);           // taban
+                // iki kefe ( V)
+                g.drawLine(x, y + s / 5, x + s / 6, y + s / 2);
+                g.drawLine(x + s / 3, y + s / 2, x + s / 6, y + s / 2);
+                g.drawLine(x + s, y + s / 5, x + s - s / 6, y + s / 2);
+                g.drawLine(x + s - s / 3, y + s / 2, x + s - s / 6, y + s / 2);
                 break;
-            case 2: // teslim (kutuya ok)
-                g.drawRect(x, y + s / 3, s, s - s / 3);
-                g.drawLine(x + s / 2, y, x + s / 2, y + s / 2);
-                g.drawLine(x + s / 2 - s / 4, y + s / 4, x + s / 2, y + s / 2);
-                g.drawLine(x + s / 2 + s / 4, y + s / 4, x + s / 2, y + s / 2);
+            }
+            case 2: { // teslim: kutuya inen ok
+                g.drawLine(x + s / 2, y, x + s / 2, y + s * 3 / 5);
+                g.drawLine(x + s / 2 - s / 4, y + s * 7 / 20, x + s / 2, y + s * 3 / 5);
+                g.drawLine(x + s / 2 + s / 4, y + s * 7 / 20, x + s / 2, y + s * 3 / 5);
+                g.drawLine(x, y + s * 3 / 5, x, y + s);       // kutu (üstü açık)
+                g.drawLine(x + s, y + s * 3 / 5, x + s, y + s);
+                g.drawLine(x, y + s, x + s, y + s);
                 break;
-            case 3: // bükme yok (kart + yasak)
-                g.drawRoundRect(x, y + s / 4, s, s / 2, s / 6, s / 6);
-                g.drawOval(x + s / 4, y, s, s);
-                g.drawLine(x + s / 4, y + s, x + s / 4 + s, y);
+            }
+            case 3: { // bükme yok: kart + yasak dairesi
+                g.drawRoundRect(x + s / 8, y + s * 3 / 8, s * 3 / 4, s / 4, s / 8, s / 8);
+                g.drawOval(x, y, s, s);
+                g.drawLine(x + (int) (s * 0.15), y + (int) (s * 0.85),
+                           x + (int) (s * 0.85), y + (int) (s * 0.15));
                 break;
-            default: // web (dünya)
+            }
+            default: { // web: dünya (boylam + enlem)
                 g.drawOval(x, y, s, s);
                 g.drawOval(x + s / 3, y, s / 3, s);
                 g.drawLine(x, y + s / 2, x + s, y + s / 2);
+                g.drawLine(x + (int) (s * 0.07), y + s / 4, x + (int) (s * 0.93), y + s / 4);
+                g.drawLine(x + (int) (s * 0.07), y + s * 3 / 4, x + (int) (s * 0.93), y + s * 3 / 4);
                 break;
+            }
         }
     }
 
