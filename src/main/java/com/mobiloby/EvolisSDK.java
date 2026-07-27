@@ -41,7 +41,7 @@ public interface EvolisSDK extends Library {
         int BACK = 1;
     }
 
-    /** Baskı sonrası kart nereye gitsin. */
+    /** SDK fonksiyonlarının döndürdüğü genel hata/durum kodları. */
     interface Ret {
         int OK = 0;
         int EUNDEFINED = -1, EINTERNAL = -2, ECANCELLED = -3, EDISABLED = -4;

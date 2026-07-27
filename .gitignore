@@ -39,6 +39,10 @@ Thumbs.db
 src/protocol_full.txt
 src/CRT_591_MRXX_Protocol*.pdf
 
+# ICAO 9303 referans dokümanı (dışarıdan indirildi, kaynak kod değil)
+9303_p11_cons_en.pdf
+9303_p11.txt
+
 # Logoların ham hâlleri kök dizine bırakıldı; kullanılan temiz kopyalar assets/ içinde
 EGO_Genel_Müdürlüğü_logo.png
 ankara-buyuksehir-belediyesi-logo-png_seeklogo-260961.png
