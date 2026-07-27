@@ -43,6 +43,9 @@ src/CRT_591_MRXX_Protocol*.pdf
 9303_p11_cons_en.pdf
 9303_p11.txt
 
+# Maven dependency:build-classpath çıktısı (geçici)
+cp.txt
+
 # Logoların ham hâlleri kök dizine bırakıldı; kullanılan temiz kopyalar assets/ içinde
 EGO_Genel_Müdürlüğü_logo.png
 ankara-buyuksehir-belediyesi-logo-png_seeklogo-260961.png

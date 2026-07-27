@@ -801,6 +801,7 @@ public class MainUI extends JFrame {
 
     private void log(String msg) {
         String line = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + "  " + msg;
+        System.out.println(line);   // konsola da yansıt (tanılama/log dosyası için)
         SwingUtilities.invokeLater(() -> {
             logArea.append(line + "\n");
             logArea.setCaretPosition(logArea.getDocument().getLength());

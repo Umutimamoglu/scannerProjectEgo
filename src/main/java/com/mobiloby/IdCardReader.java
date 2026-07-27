@@ -4,6 +4,7 @@ import com.sun.jna.ptr.IntByReference;
 import net.sf.scuba.smartcards.CardService;
 import org.jmrtd.BACKey;
 import org.jmrtd.PassportService;
+import org.jmrtd.lds.SODFile;
 import org.jmrtd.lds.icao.DG11File;
 import org.jmrtd.lds.icao.DG12File;
 import org.jmrtd.lds.icao.DG1File;
@@ -16,13 +17,16 @@ import javax.imageio.ImageIO;
 import javax.smartcardio.CardTerminal;
 import javax.smartcardio.TerminalFactory;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -63,6 +67,9 @@ public class IdCardReader implements AutoCloseable {
 
         /** BAC için ham MRZ değerleri (YYMMDD). */
         public String bacDocNo = "", bacBirth = "", bacExpiry = "";
+
+        /** Passive Authentication sonucu (çip verisi gerçek mi). null = yapılmadı. */
+        public ChipVerifier.Result verification;
     }
 
     /** Tarama sonucu — MRZ metni ve üretilen görüntüler. */
@@ -256,10 +263,21 @@ public class IdCardReader implements AutoCloseable {
             IdData d = new IdData();
             d.bacDocNo = docNo; d.bacBirth = dob; d.bacExpiry = exp;
 
-            readDg1(service, d);
-            readDg2(service, d);
-            readDg11(service, d);   // DG1'in üzerine yazar — Türkçe karakterler burada
-            readDg12(service, d);
+            // Her DG'yi çipten HAM byte olarak bir kez oku; hem hash hem parse
+            // aynı byte'lardan yapılır (Passive Authentication doğru çalışsın diye).
+            Map<Integer, byte[]> rawDgs = new LinkedHashMap<>();
+            byte[] rawDg1  = readRaw(service, PassportService.EF_DG1,  1,  rawDgs);
+            byte[] rawDg2  = readRaw(service, PassportService.EF_DG2,  2,  rawDgs);
+            byte[] rawDg11 = readRaw(service, PassportService.EF_DG11, 11, rawDgs);
+            byte[] rawDg12 = readRaw(service, PassportService.EF_DG12, 12, rawDgs);
+
+            if (rawDg1  != null) parseDg1(rawDg1, d);
+            if (rawDg2  != null) parseDg2(rawDg2, d);
+            if (rawDg11 != null) parseDg11(rawDg11, d);  // DG1'in üzerine yazar — Türkçe karakterler
+            if (rawDg12 != null) parseDg12(rawDg12, d);
+
+            // SOD'u oku ve Passive Authentication (hash kontrolü) yap
+            verifyChip(service, rawDgs, d);
 
             return d;
         } finally {
@@ -268,9 +286,33 @@ public class IdCardReader implements AutoCloseable {
         }
     }
 
-    private void readDg1(PassportService service, IdData d) {
-        try (InputStream in = service.getInputStream(PassportService.EF_DG1)) {
-            MRZInfo m = new DG1File(in).getMRZInfo();
+    /** Bir DG'yi çipten ham byte olarak oku; başarılıysa rawDgs'e ekle ve döndür. */
+    private byte[] readRaw(PassportService service, short fid, int dgNum, Map<Integer, byte[]> rawDgs) {
+        try (InputStream in = service.getInputStream(fid)) {
+            byte[] raw = readAll(in);
+            rawDgs.put(dgNum, raw);
+            return raw;
+        } catch (Exception e) {
+            log("DG" + dgNum + " okunamadı: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** SOD'u oku ve Passive Authentication doğrulamasını çalıştır (bilgilendirici mod). */
+    private void verifyChip(PassportService service, Map<Integer, byte[]> rawDgs, IdData d) {
+        try (InputStream in = service.getInputStream(PassportService.EF_SOD)) {
+            SODFile sod = new SODFile(new ByteArrayInputStream(readAll(in)));
+            ChipVerifier verifier = new ChipVerifier(AppPaths.resolve("certs"), this::log);
+            d.verification = verifier.verifyPassiveAuth(sod, rawDgs);
+            for (String line : d.verification.report()) log(line);
+        } catch (Exception e) {
+            log("  [PA] SOD okunamadı, doğrulama atlandı: " + e.getMessage());
+        }
+    }
+
+    private void parseDg1(byte[] raw, IdData d) {
+        try {
+            MRZInfo m = new DG1File(new ByteArrayInputStream(raw)).getMRZInfo();
             d.name = clean(m.getSecondaryIdentifier());
             d.surname = clean(m.getPrimaryIdentifier());
             d.documentNumber = m.getDocumentNumber();
@@ -284,20 +326,20 @@ public class IdCardReader implements AutoCloseable {
             if (pn != null) d.tcNo = pn.replace("<", "").trim();
             log("DG1 okundu.");
         } catch (Exception e) {
-            log("DG1 okunamadı: " + e.getMessage());
+            log("DG1 çözümlenemedi: " + e.getMessage());
         }
     }
 
-    private void readDg2(PassportService service, IdData d) {
-        try (InputStream in = service.getInputStream(PassportService.EF_DG2)) {
-            DG2File dg2 = new DG2File(in);
+    private void parseDg2(byte[] raw, IdData d) {
+        try {
+            DG2File dg2 = new DG2File(new ByteArrayInputStream(raw));
             for (FaceInfo fi : dg2.getFaceInfos()) {
                 for (FaceImageInfo img : fi.getFaceImageInfos()) {
                     byte[] bytes;
                     try (InputStream is = img.getImageInputStream()) {
                         bytes = readAll(is);
                     }
-                    BufferedImage bi = ImageIO.read(new java.io.ByteArrayInputStream(bytes));
+                    BufferedImage bi = ImageIO.read(new ByteArrayInputStream(bytes));
                     if (bi != null) {
                         d.photo = bi;
                         java.nio.file.Files.createDirectories(OUT_DIR);
@@ -309,13 +351,13 @@ public class IdCardReader implements AutoCloseable {
             }
             log("DG2 okundu ama görüntü çözülemedi (JP2 plugin?).");
         } catch (Exception e) {
-            log("DG2 okunamadı: " + e.getMessage());
+            log("DG2 çözümlenemedi: " + e.getMessage());
         }
     }
 
-    private void readDg11(PassportService service, IdData d) {
-        try (InputStream in = service.getInputStream(PassportService.EF_DG11)) {
-            DG11File dg11 = new DG11File(in);
+    private void parseDg11(byte[] raw, IdData d) {
+        try {
+            DG11File dg11 = new DG11File(new ByteArrayInputStream(raw));
 
             // Tam ad "SOYAD<<AD" biçiminde — Türkçe karakterlerle
             String full = dg11.getNameOfHolder();
@@ -342,13 +384,13 @@ public class IdCardReader implements AutoCloseable {
             }
             log("DG11 okundu (Türkçe isimler).");
         } catch (Exception e) {
-            log("DG11 okunamadı: " + e.getMessage());
+            log("DG11 çözümlenemedi: " + e.getMessage());
         }
     }
 
-    private void readDg12(PassportService service, IdData d) {
-        try (InputStream in = service.getInputStream(PassportService.EF_DG12)) {
-            DG12File dg12 = new DG12File(in);
+    private void parseDg12(byte[] raw, IdData d) {
+        try {
+            DG12File dg12 = new DG12File(new ByteArrayInputStream(raw));
             if (dg12.getIssuingAuthority() != null) {
                 d.issuingAuthority = dg12.getIssuingAuthority().trim();
             }
@@ -359,7 +401,7 @@ public class IdCardReader implements AutoCloseable {
             }
             log("DG12 okundu.");
         } catch (Exception e) {
-            log("DG12 okunamadı: " + e.getMessage());
+            log("DG12 çözümlenemedi: " + e.getMessage());
         }
     }
 

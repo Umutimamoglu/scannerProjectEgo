@@ -10,7 +10,20 @@
       "WebFetch(domain:www.icao.int)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:sbdepo.tckk.gov.tr)",
-      "Bash(\"/c/Program Files/Git/mingw64/bin/pdftotext.exe\" -layout \"/c/Users/Admin/scannerProjectEgo/9303_p11_cons_en.pdf\" \"/c/Users/Admin/scannerProjectEgo/9303_p11.txt\")"
+      "Bash(\"/c/Program Files/Git/mingw64/bin/pdftotext.exe\" -layout \"/c/Users/Admin/scannerProjectEgo/9303_p11_cons_en.pdf\" \"/c/Users/Admin/scannerProjectEgo/9303_p11.txt\")",
+      "Bash(ls -la /c/Users/Admin/Downloads/ | grep -iE \"csca|sbmk|kok|\\\\.cer|\\\\.crt|\\\\.pem|\\\\.der\" 2>/dev/null; echo \"=== geniş arama ===\"; find /c/Users/Admin/Downloads -maxdepth 1 -iname \"*csca*\" -o -iname \"*sbmk*\" -o -iname \"*kok*\" 2>/dev/null)",
+      "Read(//c/Users/Admin/Downloads//**)",
+      "Read(//c/Users/Admin/Downloads/**)",
+      "Bash(javap -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar org.jmrtd.lds.icao.DG15File)",
+      "Bash(javap -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar org.jmrtd.protocol.AAResult)",
+      "Bash(javap -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar net.sf.scuba.smartcards.CardFileInputStream)",
+      "Bash(cd /c/Users/Admin/scannerProjectEgo)",
+      "Bash(export JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot\")",
+      "Bash(./.mvn/wrapper/apache-maven/bin/mvn.cmd -q compile)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(./.mvn/wrapper/apache-maven/bin/mvn.cmd -q dependency:build-classpath -Dmdep.outputFile=cp.txt)",
+      "Bash(tasklist)",
+      "Bash(taskkill //F //IM java.exe)"
     ]
   }
 }
