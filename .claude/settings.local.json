@@ -23,7 +23,17 @@
       "Bash(echo \"EXIT: $?\")",
       "Bash(./.mvn/wrapper/apache-maven/bin/mvn.cmd -q dependency:build-classpath -Dmdep.outputFile=cp.txt)",
       "Bash(tasklist)",
-      "Bash(taskkill //F //IM java.exe)"
+      "Bash(taskkill //F //IM java.exe)",
+      "Bash(javap -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar org.jmrtd.lds.SignedDataUtil)",
+      "Bash(javap -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar -p org.jmrtd.lds.SODFile)",
+      "Bash(./.mvn/wrapper/apache-maven/bin/mvn.cmd -q dependency:resolve)",
+      "Read(//c/Users/Admin/.m2/**)",
+      "Bash(xxd output/last_sod.bin)",
+      "Bash(cp output/last_sod.bin __TRACKED_VAR__/sod_read1.bin)",
+      "Bash(certutil -hashfile __TRACKED_VAR__/sod_read1.bin SHA256)",
+      "Bash('/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot/bin/javap.exe' -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar org.jmrtd.PassportService)",
+      "Bash(xxd -s $\\(\\(2351-280\\)\\) output/last_sod.bin)",
+      "Bash(rm -f output/last_sod.bin output/last_dg*.bin)"
     ]
   }
 }

@@ -4,7 +4,6 @@ import com.sun.jna.ptr.IntByReference;
 import net.sf.scuba.smartcards.CardService;
 import org.jmrtd.BACKey;
 import org.jmrtd.PassportService;
-import org.jmrtd.lds.SODFile;
 import org.jmrtd.lds.icao.DG11File;
 import org.jmrtd.lds.icao.DG12File;
 import org.jmrtd.lds.icao.DG1File;
@@ -301,9 +300,9 @@ public class IdCardReader implements AutoCloseable {
     /** SOD'u oku ve Passive Authentication doğrulamasını çalıştır (bilgilendirici mod). */
     private void verifyChip(PassportService service, Map<Integer, byte[]> rawDgs, IdData d) {
         try (InputStream in = service.getInputStream(PassportService.EF_SOD)) {
-            SODFile sod = new SODFile(new ByteArrayInputStream(readAll(in)));
+            byte[] rawSod = readAll(in);
             ChipVerifier verifier = new ChipVerifier(AppPaths.resolve("certs"), this::log);
-            d.verification = verifier.verifyPassiveAuth(sod, rawDgs);
+            d.verification = verifier.verifyPassiveAuth(rawSod, rawDgs);
             for (String line : d.verification.report()) log(line);
         } catch (Exception e) {
             log("  [PA] SOD okunamadı, doğrulama atlandı: " + e.getMessage());

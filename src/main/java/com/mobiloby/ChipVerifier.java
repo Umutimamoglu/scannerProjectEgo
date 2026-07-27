@@ -1,15 +1,19 @@
 package com.mobiloby;
 
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
+import org.bouncycastle.cms.CMSSignedData;
+import org.bouncycastle.cms.SignerInformation;
+import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.jmrtd.lds.SODFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
-import java.security.PublicKey;
 import java.security.Security;
-import java.security.Signature;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertificateFactory;
@@ -134,17 +138,26 @@ public class ChipVerifier {
     }
 
     /**
-     * Passive Authentication — Kontrol 1: DG hash karşılaştırma.
+     * Passive Authentication.
+     *   Kontrol 1: DG hash karşılaştırma (veri tahrif edilmiş mi)
+     *   Kontrol 2: SOD imzası + sertifika zinciri (imza gerçek mi, hangi sürüm)
      *
-     * @param sod      çipten okunan Document Security Object
+     * @param rawSod   çipten okunan EF.SOD'un HAM byte'ları (0x77 sarmalı dahil)
      * @param rawDgs   DG numarası → çipten okunan HAM byte (parse edilmemiş)
      */
-    public Result verifyPassiveAuth(SODFile sod, Map<Integer, byte[]> rawDgs) {
+    public Result verifyPassiveAuth(byte[] rawSod, Map<Integer, byte[]> rawDgs) {
         Result r = new Result();
         r.trustAnchorCount = trustAnchors.size();
 
-        if (sod == null) {
+        if (rawSod == null) {
             r.checks.add(new Check("SOD okunamadı", false, "doğrulama yapılamıyor"));
+            return r;
+        }
+        SODFile sod;
+        try {
+            sod = new SODFile(new ByteArrayInputStream(rawSod));
+        } catch (Exception e) {
+            r.checks.add(new Check("SOD çözümlenemedi", false, e.getMessage()));
             return r;
         }
 
@@ -182,17 +195,17 @@ public class ChipVerifier {
         }
 
         // Kontrol 2: SOD imzası gerçek mi + hangi köke bağlı (sürüm)
-        verifyDocumentSigner(sod, r);
+        verifyDocumentSigner(sod, rawSod, r);
         return r;
     }
 
     /**
      * Passive Authentication — Kontrol 2:
-     *   (a) SOD imzasını, içindeki Document Signer sertifikasıyla doğrula
-     *   (b) O sertifikayı CSCA kök sertifikalarına kadar zincirle
+     *   (a) SOD imzasını CMS motoruyla doğrula (signed attributes + PSS/PKCS1 otomatik)
+     *   (b) İçindeki Document Signer sertifikasını CSCA köklerine kadar zincirle
      * Zincir tutarsa r.matchedRootCN hangi köke (= hangi sürüme) bağlı olduğunu söyler.
      */
-    private void verifyDocumentSigner(SODFile sod, Result r) {
+    private void verifyDocumentSigner(SODFile sod, byte[] rawSod, Result r) {
         X509Certificate ds;
         try {
             ds = sod.getDocSigningCertificate();
@@ -207,16 +220,20 @@ public class ChipVerifier {
         r.checks.add(new Check("Document Signer sertifikası bulundu", true,
                 cn(ds.getSubjectX500Principal().getName())));
 
-        // (a) SOD imzasını DS public key ile doğrula
+        // (a) SOD imzasını CMS ile doğrula. EF.SOD = 0x77 sarmalı içinde ContentInfo (CMS).
         try {
-            PublicKey dsKey = ds.getPublicKey();
-            String sigAlg = deriveSigAlg(sod, dsKey);
-            Signature sig = getSignature(sigAlg);
-            sig.initVerify(dsKey);
-            sig.update(sod.getEContent());
-            r.sodSignatureValid = sig.verify(sod.getEncryptedDigest());
-            r.checks.add(new Check("SOD imzası", r.sodSignatureValid,
-                    r.sodSignatureValid ? "geçerli (" + sigAlg + ")" : "GEÇERSİZ (" + sigAlg + ")"));
+            byte[] cms = stripApplicationTag(rawSod);
+            CMSSignedData signedData = new CMSSignedData(cms);
+            X509CertificateHolder holder = new JcaX509CertificateHolder(ds);
+            boolean verified = false;
+            for (SignerInformation signer : signedData.getSignerInfos().getSigners()) {
+                verified = signer.verify(new JcaSimpleSignerInfoVerifierBuilder()
+                        .setProvider(BouncyCastleProvider.PROVIDER_NAME).build(holder));
+                if (verified) break;
+            }
+            r.sodSignatureValid = verified;
+            r.checks.add(new Check("SOD imzası", verified,
+                    verified ? "geçerli (CMS: signed attributes doğrulandı)" : "GEÇERSİZ"));
         } catch (Exception e) {
             r.checks.add(new Check("SOD imzası", false, "doğrulanamadı: " + e.getMessage()));
         }
@@ -242,31 +259,25 @@ public class ChipVerifier {
         }
     }
 
-    /** SOD'un imza algoritmasını JCA adına çevir (örn. SHA256withRSA). */
-    private static String deriveSigAlg(SODFile sod, PublicKey dsKey) {
-        // Önce SOD'un verdiği adı dene
-        try {
-            String a = sod.getDigestEncryptionAlgorithm();
-            if (a != null && a.toLowerCase().contains("with")) return a;
-        } catch (Exception ignore) {}
-        // Aksi halde: özet algoritması + anahtar tipinden kur
-        String digest = "SHA-256";
-        try {
-            String d = sod.getSignerInfoDigestAlgorithm();
-            if (d != null && !d.isBlank()) digest = d;
-        } catch (Exception ignore) {}
-        String d = digest.replace("-", "").toUpperCase();   // SHA-256 -> SHA256
-        String keyAlg = dsKey.getAlgorithm();               // RSA / EC / ...
-        String with = "EC".equalsIgnoreCase(keyAlg) ? "ECDSA" : keyAlg;
-        return d + "with" + with;
-    }
-
-    private static Signature getSignature(String alg) throws Exception {
-        try {
-            return Signature.getInstance(alg);
-        } catch (Exception e) {
-            return Signature.getInstance(alg, BouncyCastleProvider.PROVIDER_NAME);
+    /**
+     * EF.SOD dış sarmalını (ASN.1 APPLICATION 23, 0x77) soyup içindeki
+     * ContentInfo (CMS) DER byte'larını döndür. Sarmal yoksa girdiyi aynen verir.
+     */
+    private static byte[] stripApplicationTag(byte[] ef) {
+        if (ef == null || ef.length < 2 || (ef[0] & 0xFF) != 0x77) return ef;
+        int idx = 1;
+        int first = ef[idx++] & 0xFF;
+        int len;
+        if (first < 0x80) {
+            len = first;
+        } else {
+            int n = first & 0x7F;
+            if (n == 0 || idx + n > ef.length) return ef;   // tanımsız uzunluk vb. — dokunma
+            len = 0;
+            for (int i = 0; i < n; i++) len = (len << 8) | (ef[idx++] & 0xFF);
         }
+        if (idx + len > ef.length) return ef;
+        return Arrays.copyOfRange(ef, idx, idx + len);
     }
 
     private static String cn(String dn) {
