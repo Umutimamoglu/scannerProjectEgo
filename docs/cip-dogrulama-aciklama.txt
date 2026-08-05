@@ -1,0 +1,126 @@
+================================================================================
+ÇİP DOĞRULAMA (T.C. KİMLİK KARTI) — NE, NASIL, NEDEN GÜVENLİ
+================================================================================
+Proje: com.mobiloby:id-scanner  |  Branch: feature/chip-verification
+
+Temassız çipteki verileri imzalamada kullanılan Seyahat Belgesi Kök Sertifikaları'na https://sbdepo.tckk.gov.tr/ adresinden ulaşabilirsiniz.
+teknik işlemler için takip edilen döküman  https://www.icao.int/sites/default/files/publications/DocSeries/9303_p11_cons_en.pdf
+--------------------------------------------------------------------------------
+1) HANGİ SORUNU ÇÖZÜYORUZ?
+--------------------------------------------------------------------------------
+Çip aslında sadece bir HAFIZA — isim, fotoğraf, doğum tarihi yazan bir dosya.
+Hafıza kopyalanabilir ve değiştirilebilir. Sistem sadece "oku ve göster" yaparsa,
+birinin uydurduğu/kopyaladığı çipi de gerçek sanır.
+
+Çözdüğümüz sorun:
+    "Bu çipteki veri gerçek mi, tahrif edilmemiş mi, bu çip klon değil mi?"
+Yani okumadan öteye geçip GÜVEN vermek.
+
+
+--------------------------------------------------------------------------------
+2) NASIL ÇÖZÜYORUZ?
+--------------------------------------------------------------------------------
+İki mekanizma (ICAO 9303 standardı):
+
+PASSIVE AUTHENTICATION (tamamlandı):
+    Devlet, kart basılırken tüm verinin özetini (SOD) kendi gizli anahtarıyla
+    imzalıyor. Biz:
+      (a) Her verinin (DG) hash'ini SOD'daki değerle karşılaştırıyoruz
+          -> tahrif kontrolü (veri değişmiş mi?)
+      (b) SOD imzasını doğrulayıp o imzayı CSCA kök sertifikasına kadar
+          zincirliyoruz
+          -> imzanın gerçekten devlete ait olduğu (sahte çip mi?)
+
+ACTIVE AUTHENTICATION (kod hazır, test aşamasında):
+    Çipin içinde DIŞARI ASLA ÇIKMAYAN özel bir anahtar var. Çipe rastgele bir
+    soru gönderip imzalatıyoruz; kopya çipte o anahtar olmadığı için cevap
+    veremez.
+          -> klon tespiti (bu veri gerçekten bu çipten mi geldi?)
+
+
+--------------------------------------------------------------------------------
+3) İNTERNETE / SERVİSE BAĞIMLILIK VAR MI?
+--------------------------------------------------------------------------------
+HAYIR, sıfır. Bütün doğrulama tamamen ÇEVRİMDIŞI (offline) çalışıyor:
+  - Kök sertifikaları BİR KEZ indirdik, uygulamanın içine (certs/) gömdük.
+  - Doğrulama sırasında sadece KART + YEREL SERTİFİKALAR kullanılıyor.
+    Hiçbir sunucuya bağlanılmıyor, hiçbir veri dışarı gitmiyor.
+
+Avantajları: internetsiz yerde de çalışır, gizlilik sızıntısı yok, hızlı.
+Tek "ara sıra internet" gereken şey: devlet sertifikaları yenilediğinde
+(rotasyon) yeni kökü indirip eklemek — o da yılda bir olur olmaz,
+HER OKUMADA DEĞİL.
+
+
+--------------------------------------------------------------------------------
+4) İŞİN CAN ALICI NOKTASI:
+   Devlet sertifikaları açıkça yayınlıyor. O zaman kötü niyetliler neden
+   "panzehir" üretemiyor?
+--------------------------------------------------------------------------------
+Buradaki sihir: AÇIK ANAHTARLI KRİPTOGRAFİNİN (public-key) temel asimetrisi.
+Anahtar iki parçalı:
+
+    +-------------------------+------------------------+--------------------------+
+    | Anahtar                 | Kimde                  | Ne yapar                 |
+    +-------------------------+------------------------+--------------------------+
+    | Açık anahtar            | Herkeste               | İmzayı DOĞRULAR,         |
+    | (sertifika — yayınlanan)|                        | imza ATAMAZ              |
+    +-------------------------+------------------------+--------------------------+
+    | Gizli anahtar           | Sadece devlette        | İmza ATAR                |
+    |                         | (HSM'de, hiç çıkmaz)   |                          |
+    +-------------------------+------------------------+--------------------------+
+
+İşin bütün espirisi: Yayınlanan sertifika sadece AÇIK anahtarı içeriyor.
+Açık anahtarla bir imzayı KONTROL edebilirsin (bizim yaptığımız), ama yeni bir
+geçerli imza ÜRETEMEZSİN. Sahte bir kart yapmak için saldırganın SOD'u devletin
+GİZLİ anahtarıyla imzalaması gerekir — o anahtar onda yok.
+
+Yani sertifikayı yayınlamak GÜVENLİ, çünkü:
+  - Doğrulama -> herkese açık (matematiksel olarak açık anahtar yeter)
+  - İmzalama  -> gizli (sadece gizli anahtar yapabilir, devlette)
+
+Saldırganın "panzehir" üretmesi için iki yol var, ikisi de pratikte imkânsız:
+  1. Devletin gizli anahtarını çalmak — HSM'lerde saklanıyor, fiziksel/mantıksal
+     olarak aşırı korunuyor.
+  2. RSA/ECDSA'yı matematiksel kırmak — 2048-bit RSA'yı kaba kuvvetle çözmek
+     bugünkü tüm bilgisayarlarla milyarlarca yıl sürer.
+
+BİR ADIM DAHA (Active Authentication):
+    İkinci bir gizli katman ekliyor — her çipin KENDİNE ÖZEL, çip içinde üretilip
+    hiç dışarı çıkmayan bir anahtarı var. Saldırgan bir kartın tüm verisini
+    birebir kopyalasa (imza dahil, PA'yı geçse bile), o gizli anahtarı çipten
+    ÇIKARAMAZ — bu yüzden klon, canlı soru-cevapta yakalanır. Yine aynı mantık:
+    açık anahtarı okuyabilir ama gizli anahtarı ele geçiremez.
+
+
+--------------------------------------------------------------------------------
+ÖZET
+--------------------------------------------------------------------------------
+Sistem "gizli bir algoritma" üzerine değil, şu asimetri üzerine kurulu:
+    "Herkes doğrulayabilsin ama SADECE devlet imzalayabilsin."
+
+Sertifikaların açık olması bir zafiyet değil, tasarımın GEREĞİ — güvenlik
+algoritmanın gizliliğinden değil, GİZLİ ANAHTARIN DEVLETTE KALMASINDAN geliyor.
+
+Kötü niyetli biri ne kadar uğraşırsa uğraşsın, elindeki açık anahtarla ancak
+bizim yaptığımızı yapabilir: KONTROL ETMEK, taklit etmek değil.
+
+
+--------------------------------------------------------------------------------
+TEKNİK NOTLAR (uygulama tarafı)
+--------------------------------------------------------------------------------
+  - Kütüphaneler: jMRTD (çip okuma + LDS parse), BouncyCastle bcprov + bcpkix
+    (CMS/PKIX imza doğrulama). Ekstra bir kripto kodu yazılmadı; standart
+    kütüphaneler kullanıldı.
+  - Kök sertifikalar: certs/ klasöründe
+        CSCA_TR.crt       (T.C. Kök — Sürüm 1)
+        CSCA_TR_v2.crt    (T.C. Kök — Sürüm 2)
+        SBMK_KOK.crt      (Mavi Kart Kök — Sürüm 1)
+    SHA-256 özetleri sbdepo.tckk.gov.tr listesiyle karşılaştırılıp doğrulandı.
+  - Çip erişimi: BAC (MRZ'den anahtar türetme) ile güvenli kanal; okuma jMRTD
+    PassportService üzerinden PC/SC ile yapılıyor (native DLL değil).
+  - Mevcut mod: BİLGİLENDİRİCİ — doğrulama sonucu raporlanıyor ama henüz hiçbir
+    kart reddedilmiyor. Güven oturunca "başarısızsa reddet" moduna geçilebilir.
+  - Bakım: Devlet yeni kök sertifika (Sürüm 3 vb.) yayınladığında certs/
+    klasörüne eklenmeli; aksi halde yeni kartlar reddedilebilir.
+================================================================================
