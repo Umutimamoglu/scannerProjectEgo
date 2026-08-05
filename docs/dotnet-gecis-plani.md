@@ -86,23 +86,29 @@ Mevcut Java kodunda düzeltilecek somut sorunlar var — geçiş bunları taşı
 
 ```
 IdScanner.sln
-├─ IdScanner.Core     → donanımsız mantık (MRZ parse, model sınıfları, yollar)
-├─ IdScanner.Crypto   → çip doğrulama (PA + AA)
-├─ IdScanner.Chip     → PC/SC, BAC, secure messaging, DG çözümleme
-├─ IdScanner.Native   → P/Invoke: evolis.dll, IDSIF.dll
-├─ IdScanner.Render   → kart görseli üretimi
-├─ IdScanner.App      → WinForms arayüz
-└─ IdScanner.Tests    → hepsinin testleri
+├─ IdScanner.Core        → donanımsız mantık (MRZ parse, model sınıfları, yollar)
+├─ IdScanner.Application → akış orkestrasyonu (tara → oku → doğrula → çiz → bas)
+├─ IdScanner.Crypto      → çip doğrulama (PA + AA)
+├─ IdScanner.Chip        → PC/SC, BAC, secure messaging, DG çözümleme
+├─ IdScanner.Native      → P/Invoke: evolis.dll, IDSIF.dll
+├─ IdScanner.Render      → kart görseli üretimi
+├─ IdScanner.App         → WinForms arayüz
+└─ IdScanner.Tests       → hepsinin testleri
 ```
 
 Bu ayrımın sebebi: Java'da her şey tek pakette (`com.mobiloby`), UI ile çip okuma birbirine karışmış. Sınırları burada çiziyoruz ki her katman ayrı test edilebilsin.
 
+Katmanlar Clean Architecture ile örtüşüyor: `Core` = Domain (hiçbir DLL tanımaz), `Chip`/`Native`/`Crypto` = Infrastructure, `App` = Presentation. Ayrıntı ve gerekçe: [ileriye-donuk-mimari-notlar.md](ileriye-donuk-mimari-notlar.md).
+
 | # | İş | Bitti sayılma kriteri |
 |---|---|---|
-| 1.1 | Solution + 7 proje iskeleti, .NET 10 hedefli | `dotnet build` temiz |
+| 1.1 | Solution + 8 proje iskeleti, .NET 10 hedefli | `dotnet build` temiz |
 | 1.2 | `AppPaths` → `AppContext.BaseDirectory` (jpackage numarasına gerek yok, .NET'te bu hazır) | Paketlenmiş ve geliştirme modunda aynı kökü buluyor |
-| 1.3 | Veri modelleri: `IdData`, `CardData`, `VerificationResult` | — |
+| 1.3 | Veri modelleri: `IdData`, `CardData`, `VerificationResult` + **`KartKaynagi`** enum | Her veri alanı nereden geldiğini taşıyor |
 | 1.4 | `MrzReader.parse` + check digit mantığı → C# | Java'daki aynı MRZ metinleri aynı sonucu veriyor (birim test) |
+| 1.5 | `Application` katmanı: akış servisi — bugün düz ve sıralı, ~50 satır | Akış mantığının tamamı formun dışında |
+
+**1.3 ve 1.5 hakkında:** Bu ikisi Java'da yok, taşıma sırasında ekleniyor. Gerekçe ileriye dönük notların §5'inde: ikisi de şimdi neredeyse bedava, sonradan her akışa dokunmayı gerektirir. Davranışı değiştirmezler — `KartKaynagi` sadece bilgi taşır, `Application` katmanı mevcut akışı taşır.
 
 **Faz 1 çıktısı:** Donanımsız, saf mantık testleri yeşil.
 
