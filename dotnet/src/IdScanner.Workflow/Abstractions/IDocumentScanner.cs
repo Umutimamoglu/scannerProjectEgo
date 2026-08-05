@@ -21,9 +21,16 @@ public interface IDocumentScanner : IDisposable
     CardStatus GetCardStatus();
 
     /// <summary>
-    /// Kartı tara ve MRZ'yi çıkar, ardından çip okuma pozisyonuna taşı.
+    /// Kartı tara ve MRZ'yi çıkar.
+    ///
+    /// MRZ ayrıştırılamazsa yine de başarılı döner — görüntüler elde olur ve
+    /// <see cref="ScanResult.Mrz"/> <c>null</c> kalır. Çip okumaya devam
+    /// edilip edilmeyeceğine çağıran karar verir.
     /// </summary>
     ScanResult Scan();
+
+    /// <summary>Kartı NFC (çip okuma) pozisyonuna taşı.</summary>
+    void MoveToNfc();
 
     /// <summary>Kartı dışarı çıkar.</summary>
     void Eject();

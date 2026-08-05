@@ -22,4 +22,13 @@
     <ProjectReference Include="..\IdScanner.Workflow\IdScanner.Workflow.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      Native struct'lar internal; hizalamalarını doğrulayan testin onları
+      görmesi gerekiyor. Struct boyutu testi olmazsa bir MarshalAs kaybı
+      sessizce yanlış veri okunmasına yol açar.
+    -->
+    <InternalsVisibleTo Include="IdScanner.Tests" />
+  </ItemGroup>
+
 </Project>

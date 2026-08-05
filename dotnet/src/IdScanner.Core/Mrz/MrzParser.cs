@@ -273,26 +273,52 @@ public static class MrzParser
 
         var alternatives = BuildAlternatives(raw);
 
-        // Sayaç mantığıyla tüm kombinasyonları gez
+        // Sayaç mantığıyla tüm kombinasyonları gez.
+        //
+        // DİKKAT — bilinen zayıflık: check digit'i tutan birden fazla
+        // kombinasyon olabilir ve hangisinin doğru olduğu bilinemez. Java da
+        // ilk tutanı döndürüyordu; davranış korundu. Ama yanlış seçim yanlış
+        // BAC anahtarı üretir ve çip "sebepsizce" okunamaz. Bu yüzden burada
+        // tüm eşleşmeler sayılıyor ve birden fazlaysa uyarı düşülüyor —
+        // dönen değer değişmiyor, sadece belirsizlik görünür oluyor.
         var n = raw.Length;
         var idx = new int[n];
         var buf = new char[n];
+        string? firstMatch = null;
+        var matchCount = 0;
+        var samples = new List<string>(4);
+
         while (true)
         {
             for (var i = 0; i < n; i++) buf[i] = alternatives[i][idx[i]];
             var candidate = new string(buf);
+
             if (CheckDigit(candidate) == target)
             {
-                if (candidate != raw)
-                {
-                    log.Info($"OCR düzeltildi: '{raw}' → '{candidate}' (check digit '{expectedCheck}' uyumlu)");
-                }
-                return candidate;
+                firstMatch ??= candidate;
+                matchCount++;
+                if (samples.Count < 4) samples.Add(candidate);
             }
 
             var k = n - 1;
             while (k >= 0 && ++idx[k] >= alternatives[k].Length) { idx[k] = 0; k--; }
             if (k < 0) break;
+        }
+
+        if (firstMatch is not null)
+        {
+            if (matchCount > 1)
+            {
+                log.Warn($"OCR düzeltmesi BELİRSİZ: '{raw}' için check digit '{expectedCheck}' ile uyumlu " +
+                         $"{matchCount} aday var ({string.Join(", ", samples)}" +
+                         $"{(matchCount > samples.Count ? ", ..." : "")}). " +
+                         $"İlki seçildi: '{firstMatch}'. Çip okunamazsa ilk şüpheli burasıdır.");
+            }
+            else if (firstMatch != raw)
+            {
+                log.Info($"OCR düzeltildi: '{raw}' → '{firstMatch}' (check digit '{expectedCheck}' uyumlu)");
+            }
+            return firstMatch;
         }
 
         // Hiçbir kombinasyon tutmadı — OCR'ın okuduğu korunuyor ama bu, BAC'ın
