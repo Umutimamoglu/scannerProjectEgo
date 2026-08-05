@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Domain katmanı — en iç halka.
+
+    KURAL: Bu projenin hiçbir ProjectReference'ı ve hiçbir PackageReference'ı
+    YOKTUR ve olmamalıdır. Donanım, DLL, çizim kütüphanesi, arayüz teknolojisi
+    tanımaz. Buraya bağımlılık eklemek gerekiyorsa, kod muhtemelen yanlış
+    katmanda duruyordur.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+</Project>

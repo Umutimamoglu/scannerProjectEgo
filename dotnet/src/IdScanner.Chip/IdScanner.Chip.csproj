@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Infrastructure — temassız çip iletişimi.
+
+    Java karşılığı: IdCardReader.java + JMRTD kütüphanesinin tamamı.
+    JMRTD'nin .NET karşılığı olmadığı için BAC anahtar türetme, Secure
+    Messaging ve DG çözümleme burada elle yazılıyor (ICAO 9303 Part 11).
+
+    PCSC → javax.smartcardio karşılığı
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PCSC" Version="7.0.1" />
+    <PackageReference Include="PCSC.Iso7816" Version="7.0.1" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IdScanner.Core\IdScanner.Core.csproj" />
+    <ProjectReference Include="..\IdScanner.Workflow\IdScanner.Workflow.csproj" />
+  </ItemGroup>
+
+</Project>

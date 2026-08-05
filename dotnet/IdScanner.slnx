@@ -1,0 +1,14 @@
+﻿<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/IdScanner.App/IdScanner.App.csproj" />
+    <Project Path="src/IdScanner.Workflow/IdScanner.Workflow.csproj" />
+    <Project Path="src/IdScanner.Chip/IdScanner.Chip.csproj" />
+    <Project Path="src/IdScanner.Core/IdScanner.Core.csproj" />
+    <Project Path="src/IdScanner.Crypto/IdScanner.Crypto.csproj" />
+    <Project Path="src/IdScanner.Native/IdScanner.Native.csproj" />
+    <Project Path="src/IdScanner.Render/IdScanner.Render.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IdScanner.Tests/IdScanner.Tests.csproj" />
+  </Folder>
+</Solution>

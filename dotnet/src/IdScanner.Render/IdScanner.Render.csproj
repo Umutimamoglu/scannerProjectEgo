@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Infrastructure — kart görseli üretimi.
+
+    Java karşılığı: CardRenderer.java (java.awt.Graphics2D).
+    System.Drawing.Common seçildi çünkü Graphics2D ile kavramları birebir
+    örtüşüyor (ikisi de GDI+ soyundan) — port sırasında sürpriz en az.
+
+    net10.0-windows: System.Drawing.Common .NET 6'dan beri yalnızca
+    Windows'ta destekleniyor.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IdScanner.Core\IdScanner.Core.csproj" />
+    <ProjectReference Include="..\IdScanner.Workflow\IdScanner.Workflow.csproj" />
+  </ItemGroup>
+
+</Project>

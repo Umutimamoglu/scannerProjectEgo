@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Infrastructure — native cihaz sürücüleri (P/Invoke).
+
+    Java karşılığı: EvolisSDK.java, EvolisFlags.java, EvolisPrinter.java,
+    IDSIF.java, ScannerBridge.java (hepsi JNA ile).
+
+    KURAL: [DllImport] imzaları ve native struct'lar SADECE bu projede,
+    internal görünürlükte durur. Üst katmanlar IntPtr, Marshal veya native
+    struct görmez — Core'daki temiz tipleri görür.
+
+    net10.0-windows: evolis.dll ve IDSIF.dll Windows'a bağlı.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IdScanner.Core\IdScanner.Core.csproj" />
+    <ProjectReference Include="..\IdScanner.Workflow\IdScanner.Workflow.csproj" />
+  </ItemGroup>
+
+</Project>

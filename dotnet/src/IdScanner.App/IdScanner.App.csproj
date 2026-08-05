@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sunum katmanı — WinForms arayüz ve composition root.
+
+    Java karşılığı: MainUI.java.
+
+    Bu proje, tüm Infrastructure uygulamalarını tanıyan TEK yerdir; somut
+    sınıfları Application katmanındaki arayüzlere burada bağlarız
+    (composition root). Formun kendisi somut donanım sınıfı görmez.
+
+    KURAL: Formda iş mantığı olmaz — girdi topla, servisi çağır, sonucu göster.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IdScanner.Core\IdScanner.Core.csproj" />
+    <ProjectReference Include="..\IdScanner.Workflow\IdScanner.Workflow.csproj" />
+    <ProjectReference Include="..\IdScanner.Crypto\IdScanner.Crypto.csproj" />
+    <ProjectReference Include="..\IdScanner.Chip\IdScanner.Chip.csproj" />
+    <ProjectReference Include="..\IdScanner.Native\IdScanner.Native.csproj" />
+    <ProjectReference Include="..\IdScanner.Render\IdScanner.Render.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    Tüm projeler için ortak ayarlar. Katman kuralları csproj'lardaki
+    ProjectReference'larla zorlanıyor; buradaki ayarlar derleyici disiplini.
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- Yorumlar ve kullanıcıya görünen metinler Türkçe; kaynak dosyalar UTF-8 -->
+    <NeutralLanguage>tr-TR</NeutralLanguage>
+  </PropertyGroup>
+
+</Project>

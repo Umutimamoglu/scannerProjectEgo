@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Uygulama katmanı — akış orkestrasyonu ve portlar (arayüzler).
+
+    Donanım arayüzleri (ICardReader, ICardPrinter, IDocumentScanner...) burada
+    TANIMLANIR, Infrastructure katmanlarında UYGULANIR. Bu yüzden bağımlılık
+    oku Chip/Native/Render → Application yönünde akar, tersi değil.
+
+    KURAL: Sadece Core'a bağlıdır. Somut donanım projesine referans verilmez.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IdScanner.Core\IdScanner.Core.csproj" />
+  </ItemGroup>
+
+</Project>

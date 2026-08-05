@@ -50,3 +50,14 @@ cp.txt
 EGO_Genel_Müdürlüğü_logo.png
 ankara-buyuksehir-belediyesi-logo-png_seeklogo-260961.png
 native_x64/head.jpg
+
+# === .NET ===
+dotnet/**/bin/
+dotnet/**/obj/
+
+# Tanılama dökümü — GERÇEK KİŞİ VERİSİ içerir (ad, fotoğraf, T.C. no).
+# Çipten okunan ham DG/SOD baytları buraya düşer; asla depoya girmemeli.
+diag/
+
+# Uygulama log dosyaları
+logs/
