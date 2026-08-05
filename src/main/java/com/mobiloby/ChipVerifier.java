@@ -5,6 +5,15 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cms.CMSSignedData;
 import org.bouncycastle.cms.SignerInformation;
 import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
+import org.bouncycastle.crypto.Digest;
+import org.bouncycastle.crypto.digests.SHA1Digest;
+import org.bouncycastle.crypto.digests.SHA224Digest;
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.digests.SHA384Digest;
+import org.bouncycastle.crypto.digests.SHA512Digest;
+import org.bouncycastle.crypto.engines.RSAEngine;
+import org.bouncycastle.crypto.params.RSAKeyParameters;
+import org.bouncycastle.crypto.signers.ISO9796d2Signer;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.jmrtd.lds.SODFile;
 
@@ -13,7 +22,10 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.security.PublicKey;
 import java.security.Security;
+import java.security.Signature;
+import java.security.interfaces.RSAPublicKey;
 import java.security.cert.CertPath;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertificateFactory;
@@ -73,6 +85,9 @@ public class ChipVerifier {
         public boolean chainValid = false;         // DS sertifikası köke kadar zincirlendi mi
         public String matchedRootCN = null;        // hangi kök sertifikaya bağlandı (= sürüm)
 
+        public boolean aaAttempted = false;        // Active Authentication denendi mi (DG15 var mı)
+        public boolean aaValid = false;            // AA challenge-response doğrulandı mı
+
         /** İnsan-okur özet satırları. */
         public List<String> report() {
             List<String> out = new ArrayList<>();
@@ -87,6 +102,11 @@ public class ChipVerifier {
             }
             if (matchedRootCN != null) {
                 out.add("  [PA] Kart şu kök sertifikaya bağlı: " + matchedRootCN);
+            }
+            if (aaAttempted) {
+                out.add(aaValid
+                        ? "  [AA] Active Authentication GEÇTİ — çip gerçek (klon değil)."
+                        : "  [AA] Active Authentication BAŞARISIZ — çip klonlanmış olabilir!");
             }
             return out;
         }
@@ -257,6 +277,82 @@ public class ChipVerifier {
             r.checks.add(new Check("Sertifika zinciri", false,
                     "hiçbir köke bağlanamadı: " + e.getMessage()));
         }
+    }
+
+    /**
+     * Active Authentication doğrulaması (klon çip tespiti).
+     * Çipe gönderilen challenge, çipin DG15'teki public key'e karşılık gelen
+     * özel anahtarıyla imzalanmış olmalı. DG15'in gerçekliği PA ile kanıtlanmış
+     * olmalıdır (hash kontrolü) — aksi halde bu kontrol anlamsızdır.
+     *
+     * @return raporlanacak tek satır (çağıran loglar)
+     */
+    public static String verifyActiveAuth(PublicKey aaKey, byte[] challenge, byte[] response, Result r) {
+        r.aaAttempted = true;
+        String keyAlg = aaKey.getAlgorithm();
+        boolean ok = false;
+        String detail;
+        try {
+            if ("RSA".equalsIgnoreCase(keyAlg)) {
+                ok = verifyAaRsa((RSAPublicKey) aaKey, challenge, response);
+                detail = ok ? "RSA / ISO9796-2 challenge-response doğrulandı" : "RSA imza tutmadı";
+            } else if ("EC".equalsIgnoreCase(keyAlg) || "ECDSA".equalsIgnoreCase(keyAlg)) {
+                ok = verifyAaEc(aaKey, challenge, response);
+                detail = ok ? "ECDSA challenge-response doğrulandı" : "ECDSA imza tutmadı";
+            } else {
+                detail = "bilinmeyen AA anahtar tipi: " + keyAlg;
+            }
+        } catch (Exception e) {
+            detail = "hata: " + e.getMessage();
+        }
+        r.aaValid = ok;
+        r.checks.add(new Check("Active Authentication", ok, detail));
+        return (ok ? "  [AA ✓] " : "  [AA ✗] ") + "Active Authentication — " + detail;
+    }
+
+    /** RSA AA: ISO/IEC 9796-2 scheme 1, mesaj kurtarmalı. Yaygın özet varyantlarını dener. */
+    private static boolean verifyAaRsa(RSAPublicKey key, byte[] challenge, byte[] response) {
+        RSAKeyParameters params = new RSAKeyParameters(false, key.getModulus(), key.getPublicExponent());
+        // {digest, implicit-trailer?} kombinasyonları — kart hangisini kullandıysa tutar
+        Object[][] combos = {
+            { new SHA1Digest(),   Boolean.TRUE  },
+            { new SHA256Digest(), Boolean.FALSE },
+            { new SHA1Digest(),   Boolean.FALSE },
+            { new SHA224Digest(), Boolean.FALSE },
+            { new SHA384Digest(), Boolean.FALSE },
+            { new SHA512Digest(), Boolean.FALSE },
+        };
+        for (Object[] c : combos) {
+            try {
+                ISO9796d2Signer signer = new ISO9796d2Signer(
+                        new RSAEngine(), (Digest) c[0], (Boolean) c[1]);
+                signer.init(false, params);
+                signer.update(challenge, 0, challenge.length);
+                if (signer.verifySignature(response)) return true;
+            } catch (Exception ignore) {
+                // bu kombinasyon değil, sıradakini dene
+            }
+        }
+        return false;
+    }
+
+    /** EC AA: ECDSA-Plain (r||s bitişik). Yaygın özet varyantlarını dener. */
+    private static boolean verifyAaEc(PublicKey key, byte[] challenge, byte[] response) {
+        String[] algs = {
+            "SHA256withPLAIN-ECDSA", "SHA1withPLAIN-ECDSA", "SHA224withPLAIN-ECDSA",
+            "SHA384withPLAIN-ECDSA", "SHA512withPLAIN-ECDSA"
+        };
+        for (String alg : algs) {
+            try {
+                Signature s = Signature.getInstance(alg, BouncyCastleProvider.PROVIDER_NAME);
+                s.initVerify(key);
+                s.update(challenge);
+                if (s.verify(response)) return true;
+            } catch (Exception ignore) {
+                // sıradaki
+            }
+        }
+        return false;
     }
 
     /**

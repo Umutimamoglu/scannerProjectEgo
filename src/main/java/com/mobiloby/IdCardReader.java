@@ -4,8 +4,10 @@ import com.sun.jna.ptr.IntByReference;
 import net.sf.scuba.smartcards.CardService;
 import org.jmrtd.BACKey;
 import org.jmrtd.PassportService;
+import org.jmrtd.protocol.AAResult;
 import org.jmrtd.lds.icao.DG11File;
 import org.jmrtd.lds.icao.DG12File;
+import org.jmrtd.lds.icao.DG15File;
 import org.jmrtd.lds.icao.DG1File;
 import org.jmrtd.lds.icao.DG2File;
 import org.jmrtd.lds.icao.MRZInfo;
@@ -269,14 +271,20 @@ public class IdCardReader implements AutoCloseable {
             byte[] rawDg2  = readRaw(service, PassportService.EF_DG2,  2,  rawDgs);
             byte[] rawDg11 = readRaw(service, PassportService.EF_DG11, 11, rawDgs);
             byte[] rawDg12 = readRaw(service, PassportService.EF_DG12, 12, rawDgs);
+            // DG15 = Active Authentication public key. Varsa hash kontrolüne dahil
+            // edilir (anahtarın gerçekliği PA ile kanıtlansın diye).
+            byte[] rawDg15 = readRaw(service, PassportService.EF_DG15, 15, rawDgs);
 
             if (rawDg1  != null) parseDg1(rawDg1, d);
             if (rawDg2  != null) parseDg2(rawDg2, d);
             if (rawDg11 != null) parseDg11(rawDg11, d);  // DG1'in üzerine yazar — Türkçe karakterler
             if (rawDg12 != null) parseDg12(rawDg12, d);
 
-            // SOD'u oku ve Passive Authentication (hash kontrolü) yap
+            // SOD'u oku ve Passive Authentication (hash + imza + zincir) yap
             verifyChip(service, rawDgs, d);
+
+            // Active Authentication (klon çip tespiti) — DG15 varsa
+            if (rawDg15 != null) activeAuth(service, rawDg15, d);
 
             return d;
         } finally {
@@ -306,6 +314,40 @@ public class IdCardReader implements AutoCloseable {
             for (String line : d.verification.report()) log(line);
         } catch (Exception e) {
             log("  [PA] SOD okunamadı, doğrulama atlandı: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Active Authentication — çipe rastgele challenge gönder, DG15'teki public
+     * key'le imzalı cevabı doğrula. Klon çip tespiti (bilgilendirici mod).
+     */
+    private void activeAuth(PassportService service, byte[] rawDg15, IdData d) {
+        try {
+            java.security.PublicKey aaKey =
+                    new DG15File(new ByteArrayInputStream(rawDg15)).getPublicKey();
+            String keyAlg = aaKey.getAlgorithm();
+            int bits = -1;
+            if (aaKey instanceof java.security.interfaces.RSAPublicKey)
+                bits = ((java.security.interfaces.RSAPublicKey) aaKey).getModulus().bitLength();
+            else if (aaKey instanceof java.security.interfaces.ECPublicKey)
+                bits = ((java.security.interfaces.ECPublicKey) aaKey).getParams().getCurve().getField().getFieldSize();
+            log("  [AA] DG15 anahtarı: " + keyAlg + " " + bits + " bit");
+
+            byte[] challenge = new byte[8];
+            new java.security.SecureRandom().nextBytes(challenge);
+            String digestAlg = "EC".equalsIgnoreCase(keyAlg) ? "SHA-256" : "SHA-1";
+            String sigAlg = "EC".equalsIgnoreCase(keyAlg)
+                    ? "SHA256withECDSA" : "SHA1WithRSA/ISO9796-2";
+
+            AAResult aa = service.doAA(aaKey, digestAlg, sigAlg, challenge);
+            if (d.verification == null) d.verification = new ChipVerifier.Result();
+            String line = ChipVerifier.verifyActiveAuth(
+                    aaKey, aa.getChallenge(), aa.getResponse(), d.verification);
+            log(line);
+        } catch (Throwable e) {
+            String cause = e.getCause() != null ? " | sebep: " + e.getCause() : "";
+            log("  [AA] Active Authentication yapılamadı: "
+                    + e.getClass().getSimpleName() + ": " + e.getMessage() + cause);
         }
     }
 

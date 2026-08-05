@@ -33,7 +33,12 @@
       "Bash(certutil -hashfile __TRACKED_VAR__/sod_read1.bin SHA256)",
       "Bash('/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot/bin/javap.exe' -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar org.jmrtd.PassportService)",
       "Bash(xxd -s $\\(\\(2351-280\\)\\) output/last_sod.bin)",
-      "Bash(rm -f output/last_sod.bin output/last_dg*.bin)"
+      "Bash(rm -f output/last_sod.bin output/last_dg*.bin)",
+      "Bash(echo \"=== AAProtocol ===\")",
+      "Bash('/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot/bin/javap.exe' -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar org.jmrtd.protocol.AAProtocol)",
+      "Bash(echo \"=== ActiveAuthenticationInfo \\(algoritma sabitleri\\) ===\")",
+      "Bash('/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot/bin/javap.exe' -cp /c/Users/Admin/.m2/repository/org/jmrtd/jmrtd/0.7.31/jmrtd-0.7.31.jar org.jmrtd.lds.ActiveAuthenticationInfo)",
+      "Bash(taskkill //F //IM KimlikKartSistemi.exe)"
     ]
   }
 }
