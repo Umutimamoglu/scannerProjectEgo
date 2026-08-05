@@ -146,6 +146,20 @@ JMRTD'nin .NET karşılığı yok. Onun bizim için yaptığı işi elle yazaca�
 
 **Bilinen risk — JPEG2000 (3.5):** Java `jai-imageio-jpeg2000` kullanıyor. .NET'te JPEG2000 desteği zayıf; SkiaSharp bunu çözmez. Aday çözüm `CSJ2K` (JJ2000'in C# portu), ama doğrulanması gerekiyor. Bu tıkanırsa fotoğraf gelmez — kart basılamaz. **3.5'e erken bakılacak, faz sonuna bırakılmayacak.**
 
+### Geri dönüş noktası — hibrit çözüm
+
+**Karar:** Önce tam yerli .NET denenecek. Hibrit (çip okuma Java süreci olarak kalır, .NET ile JSON konuşur) **son çare** olarak elde tutuluyor.
+
+Bunun bir tetikleyicisi olmalı, yoksa ya hiç kullanılmaz ya da çok geç kullanılır. **Hibrite geçiş şu koşullarda gündeme gelir:**
+
+- 3.2 veya 3.3 (BAC / Secure Messaging) iki haftadan uzun süre çözülemezse, **veya**
+- 3.5 (JPEG2000) hiçbir kütüphaneyle çözülemezse — fotoğraf gelmezse kart basılamaz, tek başına yeterli sebep, **veya**
+- EGO teslim tarihi ile Faz 3'ün kalan işi çakışırsa
+
+**Kısmi hibrit mümkün ve tercih edilir:** Tıkanan tek parça (örneğin sadece JPEG2000 çözme) Java'ya bırakılır, geri kalan .NET'te kalır. Hepsini geri vermek gerekmez.
+
+**Bu karar Faz 0'a bağımlı değil** — fixture'lar her iki yolda da gerekli ve kullanılabilir. Yani Faz 0 ve 1 boşa gitmez.
+
 ---
 
 ## Faz 4 — Native cihazlar (P/Invoke)
