@@ -61,3 +61,6 @@ diag/
 
 # Uygulama log dosyaları
 logs/
+
+# Visual Studio kullanıcıya özel ayarlar
+*.csproj.user
