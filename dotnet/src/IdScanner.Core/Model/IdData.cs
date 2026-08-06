@@ -31,13 +31,13 @@ public sealed class IdData
     public string IssuingAuthority { get; set; } = "";
 
     /// <summary>
-    /// Yüz fotoğrafı — PNG olarak kodlanmış byte'lar.
+    /// Yüz fotoğrafı — çipten geldiği ham hâliyle (JPEG veya JPEG2000).
     ///
-    /// Java'da <c>BufferedImage</c> idi. Core katmanı çizim kütüphanesi
-    /// tanımadığı için burada ham byte olarak taşınıyor; görüntüye çevirme
-    /// Render/App katmanının işi.
+    /// Java'da <c>BufferedImage</c> idi ve okuma sırasında çözülüyordu. Core
+    /// katmanı çizim kütüphanesi tanımadığı için burada ham taşınıyor;
+    /// çözme Render katmanının işi.
     /// </summary>
-    public byte[]? PhotoPng { get; set; }
+    public FaceImage? Photo { get; set; }
 
     public string MrzLine1 { get; set; } = "";
     public string MrzLine2 { get; set; } = "";

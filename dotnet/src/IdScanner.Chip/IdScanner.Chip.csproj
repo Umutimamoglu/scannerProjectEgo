@@ -24,4 +24,13 @@
     <ProjectReference Include="..\IdScanner.Workflow\IdScanner.Workflow.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      BAC ve Secure Messaging iç tipleri; ICAO 9303'ün yayımlanmış test
+      vektörleriyle doğrulanabilmeleri için teste açılıyor. Bu testler,
+      çip kodunun doğruluğunu FİZİKSEL KART OLMADAN kanıtlayan tek şey.
+    -->
+    <InternalsVisibleTo Include="IdScanner.Tests" />
+  </ItemGroup>
+
 </Project>
