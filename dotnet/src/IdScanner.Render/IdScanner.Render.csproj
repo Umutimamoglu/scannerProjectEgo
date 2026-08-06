@@ -15,12 +15,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CSJ2K" Version="3.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\IdScanner.Core\IdScanner.Core.csproj" />
     <ProjectReference Include="..\IdScanner.Workflow\IdScanner.Workflow.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      JavaRandom internal; Java'nın üreteciyle birebir aynı diziyi ürettiğini
+      doğrulayan test onu görmeli. Desen bu diziye bağlı olduğu için sapma
+      arka yüz tasarımını sessizce değiştirir.
+    -->
+    <InternalsVisibleTo Include="IdScanner.Tests" />
   </ItemGroup>
 
 </Project>
