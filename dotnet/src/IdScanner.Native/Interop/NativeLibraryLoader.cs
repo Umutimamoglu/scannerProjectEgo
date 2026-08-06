@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.InteropServices;
 using IdScanner.Core.Diagnostics;
 
@@ -13,20 +14,29 @@ namespace IdScanner.Native.Interop;
 /// ve hata mesajı hangi bağımlılığın eksik olduğunu söylemiyor.
 ///
 /// Java karşılığı: IDSIF.load() ve EvolisSDK.load() içindeki
-/// <c>System.load</c> döngüsü + <c>jna.library.path</c> ayarı. .NET'te
-/// <see cref="NativeLibrary.SetDllImportResolver"/> ile çözülüyor.
+/// <c>System.load</c> döngüsü + <c>jna.library.path</c> ayarı.
 ///
-/// <b>Hata ayıklama:</b> Her yükleme denemesi ayrı ayrı loglanır. Cuma günü
-/// "DLL yüklenemedi" hatası gelirse, hangi dosyanın hangi yolda aranıp
-/// bulunamadığı log'da yazacak.
+/// <b>Önemli kısıt:</b> <see cref="NativeLibrary.SetDllImportResolver"/> bir
+/// derleme için <b>yalnızca bir kez</b> çağrılabilir; ikincisi
+/// <see cref="InvalidOperationException"/> fırlatır. Tarayıcı ve yazıcı aynı
+/// derlemede olduğu için tek bir çözümleyici kaydediliyor ve o çözümleyici
+/// kayıtlı tüm klasörleri sırayla tarıyor.
 /// </summary>
 internal static class NativeLibraryLoader
 {
     private static readonly Lock Gate = new();
-    private static readonly HashSet<string> Registered = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Aranacak klasörler — kayıt sırasına göre.</summary>
+    private static readonly List<string> SearchDirectories = [];
+
+    /// <summary>Çözümleyicisi kurulmuş derlemeler.</summary>
+    private static readonly HashSet<Assembly> ResolverInstalled = [];
+
+    /// <summary>Bağımlılıkları bir kez yüklenmiş klasörler.</summary>
+    private static readonly HashSet<string> PreloadedDirectories = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Bir derlemenin <c>DllImport</c> çağrılarını verilen klasöre yönlendir.
+    /// Bir derlemenin <c>DllImport</c> çağrılarını verilen klasöre de yönlendir.
     /// Aynı klasör için tekrar çağrılması zararsız.
     /// </summary>
     /// <param name="assembly">Çözümleyicinin bağlanacağı derleme.</param>
@@ -36,8 +46,8 @@ internal static class NativeLibraryLoader
     /// <b>yükleme sırasına göre</b>. Uzantısız yazılır.
     /// </param>
     /// <param name="log">Tanılama.</param>
-    public static void Register(
-        System.Reflection.Assembly assembly,
+    internal static void Register(
+        Assembly assembly,
         string directory,
         IReadOnlyList<string> dependencies,
         IAppLogger log)
@@ -46,33 +56,63 @@ internal static class NativeLibraryLoader
 
         lock (Gate)
         {
-            if (!Registered.Add(directory))
-            {
-                scoped.Trace($"{directory} zaten kayıtlı, atlanıyor");
-                return;
-            }
-
-            scoped.Info($"Native klasör: {directory}");
-            if (!Directory.Exists(directory))
-            {
-                scoped.Error($"Native klasör YOK: {directory} — DLL çağrıları başarısız olacak");
-            }
-
+            AddSearchDirectory(directory, scoped);
             PreloadDependencies(directory, dependencies, scoped);
+            InstallResolver(assembly, scoped);
+        }
+    }
 
-            NativeLibrary.SetDllImportResolver(assembly, (name, asm, path) =>
+    /// <summary>Klasörü arama listesine ekle (varsa tekrar ekleme).</summary>
+    private static void AddSearchDirectory(string directory, IAppLogger log)
+    {
+        if (SearchDirectories.Contains(directory, StringComparer.OrdinalIgnoreCase))
+        {
+            log.Trace($"{directory} zaten arama listesinde");
+            return;
+        }
+
+        SearchDirectories.Add(directory);
+        log.Info($"Native klasör: {directory}");
+
+        if (!Directory.Exists(directory))
+        {
+            log.Error($"Native klasör YOK: {directory} — bu klasördeki DLL çağrıları başarısız olacak");
+        }
+    }
+
+    /// <summary>
+    /// Çözümleyiciyi derleme başına bir kez kur.
+    ///
+    /// Çözümleyici, kayıtlı tüm klasörleri sırayla dener; bulamazsa çalışma
+    /// zamanının varsayılan aramasına bırakır.
+    /// </summary>
+    private static void InstallResolver(Assembly assembly, IAppLogger log)
+    {
+        if (!ResolverInstalled.Add(assembly))
+        {
+            log.Trace($"{assembly.GetName().Name} için çözümleyici zaten kurulu");
+            return;
+        }
+
+        NativeLibrary.SetDllImportResolver(assembly, (name, _, _) =>
+        {
+            // Kilit alınmadan okunuyor: kayıtlar uygulama açılışında yapılır,
+            // çözümleme ise ilk DllImport çağrısında — araya girme olmaz.
+            foreach (var directory in SearchDirectories)
             {
                 var candidate = Path.Combine(directory, name + ".dll");
                 if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out var handle))
                 {
-                    scoped.Debug($"{name} → {candidate}");
+                    log.Debug($"{name} → {candidate}");
                     return handle;
                 }
+            }
 
-                scoped.Trace($"{name} bu klasörde bulunamadı, varsayılan aramaya bırakılıyor");
-                return IntPtr.Zero; // Varsayılan arama devreye girsin
-            });
-        }
+            log.Trace($"{name} kayıtlı klasörlerde bulunamadı, varsayılan aramaya bırakılıyor");
+            return IntPtr.Zero;
+        });
+
+        log.Debug($"{assembly.GetName().Name} için DLL çözümleyicisi kuruldu");
     }
 
     /// <summary>
@@ -81,6 +121,9 @@ internal static class NativeLibraryLoader
     /// </summary>
     private static void PreloadDependencies(string directory, IReadOnlyList<string> dependencies, IAppLogger log)
     {
+        if (dependencies.Count == 0) return;
+        if (!PreloadedDirectories.Add(directory)) return;
+
         foreach (var dep in dependencies)
         {
             var path = Path.Combine(directory, dep + ".dll");

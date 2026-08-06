@@ -13,6 +13,13 @@
 
     <!-- Yorumlar ve kullanıcıya görünen metinler Türkçe; kaynak dosyalar UTF-8 -->
     <NeutralLanguage>tr-TR</NeutralLanguage>
+
+    <!--
+      Deponun kökü — native_x64, assets, certs gibi çalışma zamanı
+      klasörleri Java sürümüyle ortak kullanıldığı için depo kökünde duruyor,
+      dotnet/ altında değil.
+    -->
+    <SolutionRootDir>$(MSBuildThisFileDirectory)..\</SolutionRootDir>
   </PropertyGroup>
 
 </Project>

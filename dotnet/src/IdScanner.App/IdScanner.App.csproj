@@ -27,4 +27,28 @@
     <ProjectReference Include="..\IdScanner.Render\IdScanner.Render.csproj" />
   </ItemGroup>
 
+  <!--
+    Çalışma zamanı dosyaları çıktı klasörüne kopyalanır.
+
+    AppPaths, bunları uygulamanın yanında arar (AppContext.BaseDirectory).
+    Kopyalanmazlarsa DLL'ler bulunamaz, logolar ve kök sertifikalar eksik
+    kalır — uygulama açılır ama hiçbir iş yapamaz.
+
+    PreserveNewest: değişmeyen dosyalar tekrar kopyalanmaz; native_x64
+    içindeki büyük DLL'ler her derlemede taşınmasın diye.
+  -->
+  <ItemGroup>
+    <RuntimeAsset Include="$(SolutionRootDir)native_x64\**\*" LinkBase="native_x64" />
+    <RuntimeAsset Include="$(SolutionRootDir)native_evolis\**\*" LinkBase="native_evolis" />
+    <RuntimeAsset Include="$(SolutionRootDir)assets\**\*" LinkBase="assets" />
+    <RuntimeAsset Include="$(SolutionRootDir)certs\**\*" LinkBase="certs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="@(RuntimeAsset)">
+      <Link>%(LinkBase)\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
