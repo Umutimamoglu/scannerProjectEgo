@@ -400,7 +400,7 @@ public sealed class MainForm : Form
         _overlayRotateCheck = new CheckBox
         {
             Text = "Hazır kart ters besleniyor (180° döndür — yalnızca baskıda)",
-            Checked = true,
+            Checked = false,
             AutoSize = true,
             Margin = new Padding(2, 6, 2, 2),
         };
@@ -786,8 +786,8 @@ public sealed class MainForm : Form
 
         var confirm = MessageBox.Show(
             $"{_lastData!.Name} {_lastData.Surname} için HAZIR KARTA basılacak.\n\n" +
-            "Kartın doğru yönde takılı olduğundan emin olun:\n" +
-            "fotoğraf kutusu, normal baskıda fotoğrafın çıktığı uca gelmeli.\n\n" +
+            "Kartı DÜZ takın (çevirmeden):\n" +
+            "kırmızı baskılı yüz yukarı, otobüs görsellerinin olduğu uç önde.\n\n" +
             "Devam edilsin mi?",
             "Hazır Kart Baskı Onayı", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (confirm != DialogResult.Yes) return;

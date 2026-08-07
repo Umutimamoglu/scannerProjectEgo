@@ -207,6 +207,13 @@ public sealed class CardRenderer(IAppLogger? logger = null) : ICardRenderer
             // Beyaz = mürekkep yok. Hazır baskının korunmasını sağlayan şey bu.
             g.Clear(Color.White);
 
+            // Taklit kart yalnızca önizlemede; baskıda ShowGuides kapalı olduğu
+            // için karta yalnızca fotoğraf ve ad/soyad gider.
+            if (layout.ShowGuides)
+            {
+                PreprintedCardMockup.Draw(g, CardWidthMm, CardHeightMm, Px);
+            }
+
             DrawOverlayPhoto(g, data, layout);
             DrawOverlayText(g, data, layout);
 
@@ -325,10 +332,11 @@ public sealed class CardRenderer(IAppLogger? logger = null) : ICardRenderer
         const double Step = 5.0;
         const double LabelStep = 10.0;
 
-        using var minor = new Pen(Color.FromArgb(45, 0, 90, 180), 1f);
-        using var major = new Pen(Color.FromArgb(90, 0, 90, 180), 1f);
-        using var border = new Pen(Color.FromArgb(140, 0, 90, 180), 2f);
-        using var labelBrush = new SolidBrush(Color.FromArgb(170, 0, 90, 180));
+        // Taklit kartın kırmızı zemini üzerinde okunabilsin diye beyaz
+        using var minor = new Pen(Color.FromArgb(45, 255, 255, 255), 1f);
+        using var major = new Pen(Color.FromArgb(110, 255, 255, 255), 1f);
+        using var border = new Pen(Color.FromArgb(160, 255, 255, 255), 2f);
+        using var labelBrush = new SolidBrush(Color.FromArgb(200, 255, 255, 255));
         using var labelFont = CreateFont(2.0, FontStyle.Regular);
 
         for (var mm = Step; mm < CardWidthMm; mm += Step)
