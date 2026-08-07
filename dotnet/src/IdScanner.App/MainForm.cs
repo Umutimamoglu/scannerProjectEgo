@@ -391,7 +391,7 @@ public sealed class MainForm : Form
         _printButton.Click += (_, _) => PrintAsync(dryRun: false).Forget();
 
         // --- Hazır basılı kart üzerine baskı ---
-        _overlayPreviewButton = CreateButton("Hazır Kart Önizle (kılavuzlu)",
+        _overlayPreviewButton = CreateButton("Hazır Kart Önizle (mm ızgaralı)",
             () => PreviewOverlayAsync().Forget());
         _overlayPrintButton = CreateBigButton("HAZIR KARTA BAS (tek yüz)");
         _overlayPrintButton.Dock = DockStyle.Fill;
@@ -399,7 +399,7 @@ public sealed class MainForm : Form
 
         _overlayRotateCheck = new CheckBox
         {
-            Text = "Hazır kart ters besleniyor (180° döndür)",
+            Text = "Hazır kart ters besleniyor (180° döndür — yalnızca baskıda)",
             Checked = true,
             AutoSize = true,
             Margin = new Padding(2, 6, 2, 2),
@@ -756,10 +756,15 @@ public sealed class MainForm : Form
     /// gerekmesin diye <c>overlay-layout.txt</c> dosyasından okunuyor.
     /// Dosya yoksa varsayılan değerler kullanılır.
     /// </summary>
-    private OverlayLayout CurrentOverlayLayout(bool showGuides) =>
+    /// <param name="rotate">
+    /// Yalnızca baskıda <c>true</c>. Döndürme kartın besleme yönüyle ilgili bir
+    /// telafi; önizlemede uygulanırsa görüntü baş aşağı çıkar ve ölçü ayarlamak
+    /// imkânsızlaşır. Önizleme her zaman kartın okunacağı yönde gösterilir.
+    /// </param>
+    private OverlayLayout CurrentOverlayLayout(bool showGuides, bool rotate) =>
         OverlayLayoutFile.Load(_devices.Logger) with
         {
-            Rotate180 = _overlayRotateCheck.Checked,
+            Rotate180 = rotate,
             ShowGuides = showGuides,
         };
 
@@ -768,10 +773,11 @@ public sealed class MainForm : Form
         if (!EnsureDataRead()) return;
 
         var cardData = _devices.Service.BuildCardData(_lastData!, _lastPhotoPath);
-        var layout = CurrentOverlayLayout(showGuides: true);
+        var layout = CurrentOverlayLayout(showGuides: true, rotate: false);
 
         var png = await Task.Run(() => _devices.Service.PreviewOverlay(cardData, layout));
-        ShowPreviewDialog(png, "Hazır Kart Önizleme (kesikli çizgiler baskıya gitmez)");
+        ShowPreviewDialog(png,
+            "Hazır Kart Önizleme — kart okunduğu yönde (kesikli çizgiler baskıya gitmez)");
     }
 
     private async Task PrintOverlayAsync()
@@ -790,7 +796,7 @@ public sealed class MainForm : Form
         Log("Hazır karta baskı başlıyor (tek yüz)...");
 
         var cardData = _devices.Service.BuildCardData(_lastData!, _lastPhotoPath);
-        var layout = CurrentOverlayLayout(showGuides: false);
+        var layout = CurrentOverlayLayout(showGuides: false, rotate: _overlayRotateCheck.Checked);
 
         var result = await Task.Run(() => _devices.Service.PrintOverlay(cardData, layout, dryRun: false));
 

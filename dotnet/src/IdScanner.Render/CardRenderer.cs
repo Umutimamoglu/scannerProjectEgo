@@ -291,12 +291,15 @@ public sealed class CardRenderer(IAppLogger? logger = null) : ICardRenderer
     /// <summary>
     /// Yerleşim denetimi için kılavuz çizgiler — yalnızca önizlemede.
     ///
-    /// Önizlemeyi 1:1 ölçekte kâğıda basıp hazır kartın üzerine tutarak
-    /// ölçülerin doğru olup olmadığı görülebilir.
+    /// Milimetre ızgarası da çizilir: önizlemeye bakıp "fotoğraf 6 mm sağa
+    /// kaysın" gibi bir karar verilebilsin ve <c>overlay-layout.txt</c> tek
+    /// seferde doğru doldurulabilsin.
     /// </summary>
     private static void DrawOverlayGuides(Graphics g, OverlayLayout layout)
     {
-        using var pen = new Pen(Color.FromArgb(120, 200, 60, 60), 1f)
+        DrawMillimetreGrid(g);
+
+        using var pen = new Pen(Color.FromArgb(160, 200, 60, 60), 2f)
         {
             DashStyle = DashStyle.Dash,
         };
@@ -309,6 +312,41 @@ public sealed class CardRenderer(IAppLogger? logger = null) : ICardRenderer
             Px(layout.NameXMm + 30), Px(layout.NameYMm));
         g.DrawLine(pen, Px(layout.SurnameXMm), Px(layout.SurnameYMm),
             Px(layout.SurnameXMm + 30), Px(layout.SurnameYMm));
+    }
+
+    /// <summary>
+    /// 5 mm aralıklı ızgara ve 10 mm'de bir sayı etiketi.
+    ///
+    /// Ölçüler kartın sol üst köşesinden (0,0) sayılır — dosyadaki değerlerle
+    /// aynı eksen takımı.
+    /// </summary>
+    private static void DrawMillimetreGrid(Graphics g)
+    {
+        const double Step = 5.0;
+        const double LabelStep = 10.0;
+
+        using var minor = new Pen(Color.FromArgb(45, 0, 90, 180), 1f);
+        using var major = new Pen(Color.FromArgb(90, 0, 90, 180), 1f);
+        using var border = new Pen(Color.FromArgb(140, 0, 90, 180), 2f);
+        using var labelBrush = new SolidBrush(Color.FromArgb(170, 0, 90, 180));
+        using var labelFont = CreateFont(2.0, FontStyle.Regular);
+
+        for (var mm = Step; mm < CardWidthMm; mm += Step)
+        {
+            var isLabelled = Math.Abs(mm % LabelStep) < 0.001;
+            g.DrawLine(isLabelled ? major : minor, Px(mm), 0, Px(mm), CardHeightPx);
+            if (isLabelled) g.DrawString($"{mm:0}", labelFont, labelBrush, Px(mm) + 2, 2);
+        }
+
+        for (var mm = Step; mm < CardHeightMm; mm += Step)
+        {
+            var isLabelled = Math.Abs(mm % LabelStep) < 0.001;
+            g.DrawLine(isLabelled ? major : minor, 0, Px(mm), CardWidthPx, Px(mm));
+            if (isLabelled) g.DrawString($"{mm:0}", labelFont, labelBrush, 2, Px(mm) + 2);
+        }
+
+        // Kart kenarı — önizlemede kâğıt sınırı belli olsun
+        g.DrawRectangle(border, 0, 0, CardWidthPx - 1, CardHeightPx - 1);
     }
 
     // === Ön yüz ===
