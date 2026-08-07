@@ -45,6 +45,21 @@ internal static class BacHandshake
         var log = logger.ForComponent("Bac");
         using var op = log.BeginOperation("BAC karşılıklı doğrulama");
 
+        try
+        {
+            return Run(connection, keys, log, op);
+        }
+        catch (Exception e)
+        {
+            // İstisna ile çıkarken sonucu bildir; yoksa log'da sebep kaybolur.
+            op.Failed(e);
+            throw;
+        }
+    }
+
+    private static Session Run(
+        PcscConnection connection, BacKeyDerivation.KeyPair keys, IAppLogger log, OperationScope op)
+    {
         var rndIcc = GetChallenge(connection, log);
         var rndIfd = ChipCrypto.RandomBytes(ChallengeLength);
         var kIfd = ChipCrypto.RandomBytes(KeySeedLength);
@@ -111,7 +126,7 @@ internal static class BacHandshake
         log.Debug($"Oturum kuruldu, başlangıç SSC = {ssc}");
 
         op.Success();
-        return new Session(new SecureMessaging(sessionEnc, sessionMac, ssc, logger));
+        return new Session(new SecureMessaging(sessionEnc, sessionMac, ssc, log));
     }
 
     /// <summary>Çipten 8 baytlık rastgele sayı iste.</summary>

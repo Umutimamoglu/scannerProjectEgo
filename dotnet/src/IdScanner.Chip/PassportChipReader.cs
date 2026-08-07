@@ -67,31 +67,43 @@ public sealed class PassportChipReader(
             BacExpiry = credentials.DateOfExpiry,
         };
 
-        using var connection = new PcscConnection(_log, _dump);
-        connection.Connect(_cardWait);
+        try
+        {
+            using var connection = new PcscConnection(_log, _dump);
+            connection.Connect(_cardWait);
 
-        var atr = connection.GetAtr();
-        if (atr.Length > 0) _log.Debug($"Kart ATR: {Hex.ToHex(atr)}");
+            var atr = connection.GetAtr();
+            if (atr.Length > 0) _log.Debug($"Kart ATR: {Hex.ToHex(atr)}");
 
-        var keys = BacKeyDerivation.Derive(
-            credentials.DocumentNumber, credentials.DateOfBirth, credentials.DateOfExpiry, _log);
+            // SIRA ÖNEMLİ: uygulama seçimi BAC'tan önce gelmeli.
+            ChipFileReader.SelectApplication(connection, _log);
 
-        var session = BacHandshake.Perform(connection, keys, _log);
-        var files = new ChipFileReader(connection, session.Messaging, _log);
-        files.SelectApplication();
+            var keys = BacKeyDerivation.Derive(
+                credentials.DocumentNumber, credentials.DateOfBirth, credentials.DateOfExpiry, _log);
 
-        var rawDataGroups = ReadRawDataGroups(files);
-        var rawSod = ReadSod(files);
+            var session = BacHandshake.Perform(connection, keys, _log);
+            var files = new ChipFileReader(connection, session.Messaging, _log);
 
-        // Doğrulama, çözümlemeden ÖNCE — ham baytlar hâlâ elimizdeyken
-        data.Verification = VerifyPassive(rawSod, rawDataGroups);
-        TryActiveAuth(connection, session, rawDataGroups, data);
+            var rawDataGroups = ReadRawDataGroups(files);
+            var rawSod = ReadSod(files);
 
-        ParseDataGroups(rawDataGroups, data);
+            // Doğrulama, çözümlemeden ÖNCE — ham baytlar hâlâ elimizdeyken
+            data.Verification = VerifyPassive(rawSod, rawDataGroups);
+            TryActiveAuth(connection, session, rawDataGroups, data);
 
-        data.Kaynak = KartKaynagi.CipTckk;
-        op.Success($"{rawDataGroups.Count} veri grubu okundu");
-        return data;
+            ParseDataGroups(rawDataGroups, data);
+
+            data.Kaynak = KartKaynagi.CipTckk;
+            op.Success($"{rawDataGroups.Count} veri grubu okundu");
+            return data;
+        }
+        catch (Exception e)
+        {
+            // Sonucu bildirmeden çıkmayalım — aksi halde log'da işlem
+            // "sonuç bildirilmeden kapandı" diye görünür ve sebep kaybolur.
+            op.Failed(e);
+            throw;
+        }
     }
 
     /// <summary>Veri gruplarını ham olarak oku ve dök.</summary>

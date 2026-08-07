@@ -60,11 +60,33 @@ internal sealed class ChipFileReader(PcscConnection connection, SecureMessaging 
 
     private readonly IAppLogger _log = logger.ForComponent("File");
 
-    /// <summary>eMRTD uygulamasını seç (LDS1).</summary>
-    internal void SelectApplication()
+    /// <summary>
+    /// eMRTD uygulamasını seç — <b>Secure Messaging olmadan, düz komutla</b>.
+    ///
+    /// <b>Sıra kritik (ICAO 9303 Part 11):</b> Bu çağrı BAC'tan ÖNCE yapılmak
+    /// zorunda. Çip, hangi uygulamanın seçili olduğunu bilmeden BAC anahtarlarını
+    /// çözemez; uygulama seçilmeden gönderilen EXTERNAL AUTHENTICATE komutunu
+    /// reddeder (kartına göre 6A00 / 6982 / 6D00 döner).
+    ///
+    /// Java'da bu adım JMRTD'nin <c>PassportService.open()</c> çağrısının
+    /// içindeydi ve gözden kaçması kolaydı.
+    /// </summary>
+    internal static void SelectApplication(PcscConnection connection, IAppLogger logger)
     {
+        var log = logger.ForComponent("File");
         var apdu = CommandApdu.Send(ClaPlain, InsSelect, 0x04, 0x0C, ElementaryFile.ApplicationId);
-        Exchange(apdu, "eMRTD uygulaması seçme");
+
+        var response = connection.Transmit(apdu.ToBytes());
+        var (_, sw) = StatusWord.Split(response);
+
+        if (!StatusWord.IsSuccess(sw))
+        {
+            throw new ChipProtocolException(
+                $"eMRTD uygulaması seçilemedi: {StatusWord.Describe(sw)} — " +
+                "kart bir kimlik/pasaport çipi değil olabilir");
+        }
+
+        log.Debug("eMRTD uygulaması seçildi (AID A0000002471001)");
     }
 
     /// <summary>

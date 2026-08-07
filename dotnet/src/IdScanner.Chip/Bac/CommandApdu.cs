@@ -112,6 +112,7 @@ internal static class StatusWord
             0x6986 => $"{hex} (komut izinsiz — dosya seçilmemiş olabilir)",
             0x6987 => $"{hex} (beklenen Secure Messaging nesnesi eksik)",
             0x6988 => $"{hex} (Secure Messaging nesnesi hatalı — SSC kaymış olabilir)",
+            0x6A00 => $"{hex} (kesin tanı yok — genellikle uygulama seçilmeden komut gönderilmiş)",
             0x6A80 => $"{hex} (veri alanı parametreleri hatalı)",
             0x6A81 => $"{hex} (fonksiyon desteklenmiyor)",
             0x6A82 => $"{hex} (dosya bulunamadı — bu DG kartta yok)",
