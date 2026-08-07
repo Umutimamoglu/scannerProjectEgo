@@ -33,9 +33,9 @@ internal static class PreprintedCardMockup
 
     /// <summary>Boş fotoğraf kutusu — basılacak fotoğrafın hedefi.</summary>
     private const double BoxXMm = 4.0;
-    private const double BoxYMm = 53.0;
+    private const double BoxYMm = 50.0;
     private const double BoxWidthMm = 14.5;
-    private const double BoxHeightMm = 13.0;
+    private const double BoxHeightMm = 15.5;
 
     /// <summary>"Adı:" ve "Soyadı:" etiketlerinin sol kenarı.</summary>
     private const double LabelXMm = 25.0;

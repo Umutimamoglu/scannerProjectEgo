@@ -26,16 +26,25 @@ public sealed record OverlayLayout
     public double PhotoXMm { get; init; } = 4.0;
 
     /// <summary>
-    /// Fotoğraf kutusunun üst kenarı — renkli bandın (47,5+) içinde.
-    /// İlk gerçek baskıda 2 mm aşağıda kaldığı görüldü, yukarı çekildi.
+    /// Fotoğraf kutusunun üst kenarı.
+    ///
+    /// Gerçek baskılara bakılarak iki kez yukarı çekildi (55 → 53 → 50).
+    /// <b>47,5 mm'nin altına inilmemeli</b> — renkli bant orada başlıyor,
+    /// üstünde kalan kısım siyah-beyaz basar.
     /// </summary>
-    public double PhotoYMm { get; init; } = 53.0;
+    public double PhotoYMm { get; init; } = 50.0;
 
     /// <summary>Fotoğraf kutusunun genişliği.</summary>
     public double PhotoWidthMm { get; init; } = 14.5;
 
-    /// <summary>Fotoğraf kutusunun yüksekliği.</summary>
-    public double PhotoHeightMm { get; init; } = 13.0;
+    /// <summary>
+    /// Fotoğraf kutusunun yüksekliği.
+    ///
+    /// Vesikalık 3:4 ve kırpmadan sığdırıldığı için ölçüyü belirleyen kenar
+    /// bu: genişlik buradan türüyor. Fotoğrafı büyütmek için değiştirilecek
+    /// değer <see cref="PhotoWidthMm"/> değil, budur.
+    /// </summary>
+    public double PhotoHeightMm { get; init; } = 15.5;
 
     /// <summary>
     /// Ad değerinin yazılacağı X konumu.
