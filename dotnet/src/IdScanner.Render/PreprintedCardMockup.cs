@@ -33,12 +33,19 @@ internal static class PreprintedCardMockup
 
     /// <summary>Boş fotoğraf kutusu — basılacak fotoğrafın hedefi.</summary>
     private const double BoxXMm = 4.0;
-    private const double BoxYMm = 50.0;
+    private const double BoxYMm = 50.5;
     private const double BoxWidthMm = 14.5;
     private const double BoxHeightMm = 15.5;
 
-    /// <summary>"Adı:" ve "Soyadı:" etiketlerinin sol kenarı.</summary>
-    private const double LabelXMm = 25.0;
+    /// <summary>
+    /// "Adı:" ve "Soyadı:" etiketlerinin sol kenarı.
+    ///
+    /// Gerçek baskıda değerlerle etiketler arasında 4 mm fazla boşluk kaldığı
+    /// görüldü; demek ki etiketler bu taklitte çizildiğinden daha solda bitiyor.
+    /// Taklit ona göre 25 → 22 kaydırıldı, yoksa önizleme olmayan bir çakışma
+    /// gösteriyor.
+    /// </summary>
+    private const double LabelXMm = 22.0;
     private const double NameLabelBaselineMm = 61.0;
     private const double SurnameLabelBaselineMm = 65.5;
     private const double LabelSizeMm = 2.6;

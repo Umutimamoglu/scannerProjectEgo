@@ -28,11 +28,11 @@ public sealed record OverlayLayout
     /// <summary>
     /// Fotoğraf kutusunun üst kenarı.
     ///
-    /// Gerçek baskılara bakılarak iki kez yukarı çekildi (55 → 53 → 50).
+    /// Gerçek baskılara bakılarak ayarlandı (55 → 53 → 50 → 50,5).
     /// <b>47,5 mm'nin altına inilmemeli</b> — renkli bant orada başlıyor,
     /// üstünde kalan kısım siyah-beyaz basar.
     /// </summary>
-    public double PhotoYMm { get; init; } = 50.0;
+    public double PhotoYMm { get; init; } = 50.5;
 
     /// <summary>Fotoğraf kutusunun genişliği.</summary>
     public double PhotoWidthMm { get; init; } = 14.5;
@@ -51,21 +51,26 @@ public sealed record OverlayLayout
     ///
     /// Sınırı belirleyen "Soyadı:" etiketi — "Adı:"dan uzun olduğu için değer
     /// onun bittiği yerden sonra başlamalı. İkisi de aynı X'te tutuluyor ki
-    /// değerler alt alta hizalı görünsün.
+    /// değerler alt alta hizalı görünsün. Gerçek baskıda etiketle arada fazla
+    /// boşluk kaldığı görüldü, 36 → 32.
     /// </summary>
-    public double NameXMm { get; init; } = 36.0;
+    public double NameXMm { get; init; } = 32.0;
 
     /// <summary>Ad değerinin taban çizgisi — "Adı:" etiketiyle aynı satır.</summary>
     public double NameYMm { get; init; } = 61.0;
 
     /// <summary>Soyad değerinin yazılacağı X konumu — ad ile aynı hizada.</summary>
-    public double SurnameXMm { get; init; } = 36.0;
+    public double SurnameXMm { get; init; } = 32.0;
 
     /// <summary>Soyad değerinin taban çizgisi — "Soyadı:" etiketiyle aynı satır.</summary>
     public double SurnameYMm { get; init; } = 65.5;
 
-    /// <summary>Ad/soyad yazı boyutu — iki satır 4,5 mm arayla, sığması için küçük.</summary>
-    public double TextSizeMm { get; init; } = 2.4;
+    /// <summary>
+    /// Ad/soyad yazı boyutu — iki satır 4,5 mm arayla.
+    /// Kartta okunaklı olması için 2,4 → 2,7 büyütüldü; sığmazsa kod
+    /// kendiliğinden küçültür, bu yüzden üst sınır zorlanabilir.
+    /// </summary>
+    public double TextSizeMm { get; init; } = 2.7;
 
     /// <summary>
     /// Baskıdan önce görseli 180° döndür.
