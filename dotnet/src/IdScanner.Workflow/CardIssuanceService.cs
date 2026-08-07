@@ -168,6 +168,45 @@ public sealed class CardIssuanceService(
         }
     }
 
+    /// <summary>Hazır kart katmanının önizlemesi (PNG).</summary>
+    public byte[] PreviewOverlay(CardData data, OverlayLayout layout)
+        => renderer.RenderOverlayPng(data, layout);
+
+    /// <summary>
+    /// Matbaada basılmış hazır kartın üzerine <b>tek yüz</b> bas.
+    ///
+    /// Tam kart baskısından (<see cref="Print"/>) farkı: çift yüz değil,
+    /// yalnızca fotoğraf ve ad/soyad basılır, kalan her yer beyaz bırakılır —
+    /// böylece matbaa baskısı korunur.
+    /// </summary>
+    /// <param name="dryRun"><c>true</c> ise PRN üretir, kart harcamaz.</param>
+    public StepResult<PrintResult> PrintOverlay(CardData data, OverlayLayout layout, bool dryRun)
+    {
+        using var op = _log.BeginOperation(dryRun ? "Hazır kart prova" : "Hazır kart baskı");
+
+        try
+        {
+            if (!printer.IsConnected)
+            {
+                op.Failure("yazıcı bağlı değil");
+                return StepResult<PrintResult>.Failure("Yazıcı bağlı değil");
+            }
+
+            var image = renderer.RenderOverlayToBmp(data, layout);
+            var result = printer.Print(image, dryRun);
+
+            if (result.Ok) op.Success(result.Message); else op.Failure(result.Message);
+            return result.Ok
+                ? StepResult<PrintResult>.Success(result, result.Message)
+                : StepResult<PrintResult>.Failure(result.Message);
+        }
+        catch (Exception e)
+        {
+            op.Failed(e);
+            return StepResult<PrintResult>.Failure(e.Message);
+        }
+    }
+
     /// <summary>
     /// Kalibrasyon kartı bas — yarım panel renkli bandın kartın neresine
     /// düştüğünü ölçmek için.

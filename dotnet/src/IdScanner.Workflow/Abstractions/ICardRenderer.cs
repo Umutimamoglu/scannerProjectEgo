@@ -34,4 +34,18 @@ public interface ICardRenderer
     /// <summary>Kalibrasyon kartını baskı için BMP olarak diske yazar.</summary>
     /// <returns>(ön yüz yolu, arka yüz yolu)</returns>
     (string Front, string Back) RenderCalibrationToBmp();
+
+    /// <summary>
+    /// Hazır basılı kartın üzerine basılacak katman — önizleme (PNG).
+    ///
+    /// Yalnızca fotoğraf ve ad/soyad çizilir; geri kalan her yer beyaz kalır
+    /// ki matbaa baskısı üzerine mürekkep gitmesin.
+    /// </summary>
+    byte[] RenderOverlayPng(CardData data, OverlayLayout layout);
+
+    /// <summary>
+    /// Hazır kart katmanını baskı için BMP olarak diske yazar (tek yüz).
+    /// </summary>
+    /// <returns>Yazılan dosyanın yolu.</returns>
+    string RenderOverlayToBmp(CardData data, OverlayLayout layout);
 }

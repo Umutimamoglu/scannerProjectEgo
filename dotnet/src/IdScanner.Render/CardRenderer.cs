@@ -165,6 +165,152 @@ public sealed class CardRenderer(IAppLogger? logger = null) : ICardRenderer
         return (frontPath, backPath);
     }
 
+    // === Hazır basılı kart üzerine baskı ===
+
+    /// <inheritdoc />
+    public byte[] RenderOverlayPng(CardData data, OverlayLayout layout)
+    {
+        using var bitmap = RenderOverlay(data, layout);
+        return bitmap.ToPng();
+    }
+
+    /// <inheritdoc />
+    public string RenderOverlayToBmp(CardData data, OverlayLayout layout)
+    {
+        var path = Path.Combine(AppPaths.EnsureDir("output"), "card_overlay.bmp");
+        using var bitmap = RenderOverlay(data, layout);
+        SaveBmp(bitmap, path);
+        _log.Info($"Hazır kart baskı görseli yazıldı: {path}");
+        return path;
+    }
+
+    /// <summary>
+    /// Matbaada basılmış kartın üzerine eklenecek katmanı çizer.
+    ///
+    /// Yalnızca <b>fotoğraf ve ad/soyad</b> çizilir; kalan her yer beyaz kalır.
+    /// Yazıcı beyaz alanlara mürekkep basmadığı için matbaa baskısı olduğu gibi
+    /// korunur.
+    ///
+    /// Tam kart tasarımından (<see cref="RenderFront"/>) ayrı tutuldu: ikisi
+    /// farklı ürünler ve biri değişince diğeri etkilenmemeli.
+    /// </summary>
+    public Bitmap RenderOverlay(CardData data, OverlayLayout layout)
+    {
+        using var op = _log.BeginOperation("Hazır kart katmanı çizimi");
+
+        var bitmap = new Bitmap(CardWidthPx, CardHeightPx, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+        using (var g = Graphics.FromImage(bitmap))
+        {
+            g.ApplyQualitySettings();
+
+            // Beyaz = mürekkep yok. Hazır baskının korunmasını sağlayan şey bu.
+            g.Clear(Color.White);
+
+            DrawOverlayPhoto(g, data, layout);
+            DrawOverlayText(g, data, layout);
+
+            if (layout.ShowGuides) DrawOverlayGuides(g, layout);
+        }
+
+        // Kart yazıcıya ters besleneceği için görsel de döndürülür;
+        // ikisi birlikte sonucu düz hale getirir.
+        if (layout.Rotate180)
+        {
+            var rotated = GraphicsHelpers.Rotate180(bitmap);
+            bitmap.Dispose();
+            op.Success("180° döndürüldü (ters besleme)");
+            return rotated;
+        }
+
+        op.Success();
+        return bitmap;
+    }
+
+    /// <summary>Fotoğrafı hazır kartın boş kutusuna oturt.</summary>
+    private void DrawOverlayPhoto(Graphics g, CardData data, OverlayLayout layout)
+    {
+        if (string.IsNullOrWhiteSpace(data.PhotoPath) || !File.Exists(data.PhotoPath))
+        {
+            _log.Warn("Hazır kart baskısı için fotoğraf yok — kutu boş kalacak");
+            return;
+        }
+
+        var x = Px(layout.PhotoXMm);
+        var y = Px(layout.PhotoYMm);
+        var width = Px(layout.PhotoWidthMm);
+        var height = Px(layout.PhotoHeightMm);
+
+        try
+        {
+            using var photo = new Bitmap(data.PhotoPath);
+
+            // Kutuyu tamamen doldur, taşanı kırp — matbaa kutusunda beyaz
+            // kenar kalmasın.
+            var scale = Math.Max((double)width / photo.Width, (double)height / photo.Height);
+            var drawWidth = (int)Math.Round(photo.Width * scale);
+            var drawHeight = (int)Math.Round(photo.Height * scale);
+
+            var previousClip = g.Clip;
+            g.SetClip(new Rectangle(x, y, width, height));
+            g.DrawImage(photo,
+                x + (width - drawWidth) / 2,
+                y + (height - drawHeight) / 2,
+                drawWidth, drawHeight);
+            g.Clip = previousClip;
+
+            _log.Debug($"Fotoğraf yerleştirildi: {layout.PhotoXMm}×{layout.PhotoYMm} mm, " +
+                       $"{layout.PhotoWidthMm}×{layout.PhotoHeightMm} mm");
+        }
+        catch (Exception e)
+        {
+            _log.Error($"Fotoğraf çizilemedi: {data.PhotoPath}", e);
+        }
+    }
+
+    /// <summary>Ad ve soyadı hazır etiketlerin yanına yaz.</summary>
+    private void DrawOverlayText(Graphics g, CardData data, OverlayLayout layout)
+    {
+        // Saf siyah — K paneliyle basılır, konum kısıtı yok
+        using var black = new SolidBrush(Color.Black);
+        using var font = CreateFont(layout.TextSizeMm, FontStyle.Bold);
+
+        if (!string.IsNullOrWhiteSpace(data.Name))
+        {
+            g.DrawStringAtBaseline(data.Name, font, black, Px(layout.NameXMm), Px(layout.NameYMm));
+        }
+
+        if (!string.IsNullOrWhiteSpace(data.Surname))
+        {
+            g.DrawStringAtBaseline(data.Surname, font, black, Px(layout.SurnameXMm), Px(layout.SurnameYMm));
+        }
+
+        _log.Debug($"Ad '{data.Name}' ve soyad '{data.Surname}' yazıldı");
+    }
+
+    /// <summary>
+    /// Yerleşim denetimi için kılavuz çizgiler — yalnızca önizlemede.
+    ///
+    /// Önizlemeyi 1:1 ölçekte kâğıda basıp hazır kartın üzerine tutarak
+    /// ölçülerin doğru olup olmadığı görülebilir.
+    /// </summary>
+    private static void DrawOverlayGuides(Graphics g, OverlayLayout layout)
+    {
+        using var pen = new Pen(Color.FromArgb(120, 200, 60, 60), 1f)
+        {
+            DashStyle = DashStyle.Dash,
+        };
+
+        g.DrawRectangle(pen,
+            Px(layout.PhotoXMm), Px(layout.PhotoYMm),
+            Px(layout.PhotoWidthMm), Px(layout.PhotoHeightMm));
+
+        g.DrawLine(pen, Px(layout.NameXMm), Px(layout.NameYMm),
+            Px(layout.NameXMm + 30), Px(layout.NameYMm));
+        g.DrawLine(pen, Px(layout.SurnameXMm), Px(layout.SurnameYMm),
+            Px(layout.SurnameXMm + 30), Px(layout.SurnameYMm));
+    }
+
     // === Ön yüz ===
 
     /// <summary>Kartın ön yüzünü üretir.</summary>

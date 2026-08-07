@@ -58,6 +58,9 @@ public sealed class MainForm : Form
     private Button _dryRunButton = null!;
     private Button _calibrationButton = null!;
     private Button _printButton = null!;
+    private Button _overlayPreviewButton = null!;
+    private Button _overlayPrintButton = null!;
+    private CheckBox _overlayRotateCheck = null!;
 
     private Button _reconnectButton = null!;
     private TextBox _logBox = null!;
@@ -383,21 +386,46 @@ public sealed class MainForm : Form
         _dryRunButton = CreateButton("Prova Bas (kart harcamaz)", () => PrintAsync(dryRun: true).Forget());
         _calibrationButton = CreateButton("Kalibrasyon Kartı Bas", () => PrintCalibrationAsync().Forget());
 
-        _printButton = CreateBigButton("KART BAS");
+        _printButton = CreateBigButton("KART BAS (boş karta, çift yüz)");
         _printButton.Dock = DockStyle.Fill;
         _printButton.Click += (_, _) => PrintAsync(dryRun: false).Forget();
 
-        foreach (var button in new[]
+        // --- Hazır basılı kart üzerine baskı ---
+        _overlayPreviewButton = CreateButton("Hazır Kart Önizle (kılavuzlu)",
+            () => PreviewOverlayAsync().Forget());
+        _overlayPrintButton = CreateBigButton("HAZIR KARTA BAS (tek yüz)");
+        _overlayPrintButton.Dock = DockStyle.Fill;
+        _overlayPrintButton.Click += (_, _) => PrintOverlayAsync().Forget();
+
+        _overlayRotateCheck = new CheckBox
+        {
+            Text = "Hazır kart ters besleniyor (180° döndür)",
+            Checked = true,
+            AutoSize = true,
+            Margin = new Padding(2, 6, 2, 2),
+        };
+
+        foreach (Control control in new Control[]
                  {
                      _refreshButton, _clearErrorButton, _previewButton,
                      _bothPreviewButton, _dryRunButton, _calibrationButton, _printButton,
+                     CreateSeparatorLabel("— Hazır basılı kart —"),
+                     _overlayRotateCheck, _overlayPreviewButton, _overlayPrintButton,
                  })
         {
-            panel.Controls.Add(button);
+            panel.Controls.Add(control);
         }
 
         return panel;
     }
+
+    private static Label CreateSeparatorLabel(string text) => new()
+    {
+        Text = text,
+        AutoSize = true,
+        ForeColor = Neutral,
+        Margin = new Padding(2, 10, 2, 2),
+    };
 
     private Control BuildLogPanel()
     {
@@ -710,6 +738,61 @@ public sealed class MainForm : Form
 
         var cardData = _devices.Service.BuildCardData(_lastData!, _lastPhotoPath);
         var result = await Task.Run(() => _devices.Service.Print(cardData, dryRun));
+
+        Log(result.Ok ? result.Message : "HATA: " + result.Message);
+        if (!result.Ok)
+        {
+            MessageBox.Show(result.Message, "Baskı başarısız", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        SetPrinterButtonsEnabled(true);
+        await RefreshPrinterInfoAsync();
+    }
+
+    /// <summary>
+    /// Hazır kart yerleşimini ölçü dosyasından oku.
+    ///
+    /// Ölçüler ilk baskılardan sonra değişecek; her seferinde kod derlemek
+    /// gerekmesin diye <c>overlay-layout.txt</c> dosyasından okunuyor.
+    /// Dosya yoksa varsayılan değerler kullanılır.
+    /// </summary>
+    private OverlayLayout CurrentOverlayLayout(bool showGuides) =>
+        OverlayLayoutFile.Load(_devices.Logger) with
+        {
+            Rotate180 = _overlayRotateCheck.Checked,
+            ShowGuides = showGuides,
+        };
+
+    private async Task PreviewOverlayAsync()
+    {
+        if (!EnsureDataRead()) return;
+
+        var cardData = _devices.Service.BuildCardData(_lastData!, _lastPhotoPath);
+        var layout = CurrentOverlayLayout(showGuides: true);
+
+        var png = await Task.Run(() => _devices.Service.PreviewOverlay(cardData, layout));
+        ShowPreviewDialog(png, "Hazır Kart Önizleme (kesikli çizgiler baskıya gitmez)");
+    }
+
+    private async Task PrintOverlayAsync()
+    {
+        if (!EnsureDataRead()) return;
+
+        var confirm = MessageBox.Show(
+            $"{_lastData!.Name} {_lastData.Surname} için HAZIR KARTA basılacak.\n\n" +
+            "Kartın doğru yönde takılı olduğundan emin olun:\n" +
+            "fotoğraf kutusu, normal baskıda fotoğrafın çıktığı uca gelmeli.\n\n" +
+            "Devam edilsin mi?",
+            "Hazır Kart Baskı Onayı", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (confirm != DialogResult.Yes) return;
+
+        SetPrinterButtonsEnabled(false);
+        Log("Hazır karta baskı başlıyor (tek yüz)...");
+
+        var cardData = _devices.Service.BuildCardData(_lastData!, _lastPhotoPath);
+        var layout = CurrentOverlayLayout(showGuides: false);
+
+        var result = await Task.Run(() => _devices.Service.PrintOverlay(cardData, layout, dryRun: false));
 
         Log(result.Ok ? result.Message : "HATA: " + result.Message);
         if (!result.Ok)
