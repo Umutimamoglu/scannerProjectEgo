@@ -38,16 +38,19 @@ public sealed record OverlayLayout
     public double PhotoHeightMm { get; init; } = 13.0;
 
     /// <summary>
-    /// Ad değerinin yazılacağı X konumu ("Adı:" etiketinin sağı).
-    /// İlk baskıda etiketle arasında fazla boşluk kaldı, 3 mm sola alındı.
+    /// Ad değerinin yazılacağı X konumu.
+    ///
+    /// Sınırı belirleyen "Soyadı:" etiketi — "Adı:"dan uzun olduğu için değer
+    /// onun bittiği yerden sonra başlamalı. İkisi de aynı X'te tutuluyor ki
+    /// değerler alt alta hizalı görünsün.
     /// </summary>
-    public double NameXMm { get; init; } = 32.0;
+    public double NameXMm { get; init; } = 36.0;
 
     /// <summary>Ad değerinin taban çizgisi — "Adı:" etiketiyle aynı satır.</summary>
     public double NameYMm { get; init; } = 61.0;
 
     /// <summary>Soyad değerinin yazılacağı X konumu — ad ile aynı hizada.</summary>
-    public double SurnameXMm { get; init; } = 32.0;
+    public double SurnameXMm { get; init; } = 36.0;
 
     /// <summary>Soyad değerinin taban çizgisi — "Soyadı:" etiketiyle aynı satır.</summary>
     public double SurnameYMm { get; init; } = 65.5;

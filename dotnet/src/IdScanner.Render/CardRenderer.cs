@@ -252,22 +252,22 @@ public sealed class CardRenderer(IAppLogger? logger = null) : ICardRenderer
         {
             using var photo = new Bitmap(data.PhotoPath);
 
-            // Kutuyu tamamen doldur, taşanı kırp — matbaa kutusunda beyaz
-            // kenar kalmasın.
-            var scale = Math.Max((double)width / photo.Width, (double)height / photo.Height);
+            // Kutuya SIĞDIR, kırpma. Doldurup taşanı kırpmak denendi ve
+            // vesikalık 3:4 olduğu için kişinin kafasının tepesini kesiyordu.
+            // Küçük oranı seçmek en-boy oranını korur; kutuda artan yer beyaz
+            // kalır, beyaz alana mürekkep gitmediği için matbaa baskısı görünür.
+            var scale = Math.Min((double)width / photo.Width, (double)height / photo.Height);
             var drawWidth = (int)Math.Round(photo.Width * scale);
             var drawHeight = (int)Math.Round(photo.Height * scale);
 
-            var previousClip = g.Clip;
-            g.SetClip(new Rectangle(x, y, width, height));
             g.DrawImage(photo,
                 x + (width - drawWidth) / 2,
                 y + (height - drawHeight) / 2,
                 drawWidth, drawHeight);
-            g.Clip = previousClip;
 
             _log.Debug($"Fotoğraf yerleştirildi: {layout.PhotoXMm}×{layout.PhotoYMm} mm, " +
-                       $"{layout.PhotoWidthMm}×{layout.PhotoHeightMm} mm");
+                       $"kutu {layout.PhotoWidthMm}×{layout.PhotoHeightMm} mm, " +
+                       $"çizilen {drawWidth / 300.0 * 25.4:0.0}×{drawHeight / 300.0 * 25.4:0.0} mm (kırpılmadan sığdırıldı)");
         }
         catch (Exception e)
         {
@@ -275,24 +275,54 @@ public sealed class CardRenderer(IAppLogger? logger = null) : ICardRenderer
         }
     }
 
+    /// <summary>Sağ kenarda bırakılan pay — yazı kartın kenarına dayanmasın.</summary>
+    private const double OverlayRightMarginMm = 2.0;
+
+    /// <summary>Otomatik daraltmada inilebilecek en küçük punto.</summary>
+    private const double OverlayMinTextSizeMm = 1.5;
+
     /// <summary>Ad ve soyadı hazır etiketlerin yanına yaz.</summary>
     private void DrawOverlayText(Graphics g, CardData data, OverlayLayout layout)
     {
         // Saf siyah — K paneliyle basılır, konum kısıtı yok
         using var black = new SolidBrush(Color.Black);
-        using var font = CreateFont(layout.TextSizeMm, FontStyle.Bold);
 
-        if (!string.IsNullOrWhiteSpace(data.Name))
+        DrawFittedValue(g, black, data.Name, layout.NameXMm, layout.NameYMm, layout.TextSizeMm, "Ad");
+        DrawFittedValue(g, black, data.Surname, layout.SurnameXMm, layout.SurnameYMm, layout.TextSizeMm, "Soyad");
+    }
+
+    /// <summary>
+    /// Bir değeri kartın sağ kenarını aşmayacak şekilde yazar.
+    ///
+    /// Uzun soyadlar sabit puntoyla karttan taşıyordu. Sığmıyorsa punto
+    /// kademeli küçültülür; bu, kesip atmaktan iyidir çünkü kimlik kartında
+    /// eksik yazılmış bir soyad kabul edilemez.
+    /// </summary>
+    private void DrawFittedValue(
+        Graphics g, Brush brush, string? value, double xMm, double baselineMm, double sizeMm, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+
+        var availableMm = CardWidthMm - xMm - OverlayRightMarginMm;
+
+        var font = CreateFont(sizeMm, FontStyle.Bold);
+        try
         {
-            g.DrawStringAtBaseline(data.Name, font, black, Px(layout.NameXMm), Px(layout.NameYMm));
-        }
+            while (g.MeasureWidth(value, font) > Px(availableMm) && sizeMm > OverlayMinTextSizeMm)
+            {
+                sizeMm -= 0.1;
+                font.Dispose();
+                font = CreateFont(sizeMm, FontStyle.Bold);
+                _log.Debug($"{label} '{value}' sığmadı, punto {sizeMm:0.0} mm'ye düşürüldü");
+            }
 
-        if (!string.IsNullOrWhiteSpace(data.Surname))
+            g.DrawStringAtBaseline(value, font, brush, Px(xMm), Px(baselineMm));
+            _log.Debug($"{label} '{value}' yazıldı: {xMm} mm, taban {baselineMm} mm, punto {sizeMm:0.0} mm");
+        }
+        finally
         {
-            g.DrawStringAtBaseline(data.Surname, font, black, Px(layout.SurnameXMm), Px(layout.SurnameYMm));
+            font.Dispose();
         }
-
-        _log.Debug($"Ad '{data.Name}' ve soyad '{data.Surname}' yazıldı");
     }
 
     /// <summary>
