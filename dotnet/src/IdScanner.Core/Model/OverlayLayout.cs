@@ -25,8 +25,11 @@ public sealed record OverlayLayout
     /// <summary>Fotoğraf kutusunun sol kenarı.</summary>
     public double PhotoXMm { get; init; } = 4.0;
 
-    /// <summary>Fotoğraf kutusunun üst kenarı — renkli bandın (47,5+) içinde.</summary>
-    public double PhotoYMm { get; init; } = 55.0;
+    /// <summary>
+    /// Fotoğraf kutusunun üst kenarı — renkli bandın (47,5+) içinde.
+    /// İlk gerçek baskıda 2 mm aşağıda kaldığı görüldü, yukarı çekildi.
+    /// </summary>
+    public double PhotoYMm { get; init; } = 53.0;
 
     /// <summary>Fotoğraf kutusunun genişliği.</summary>
     public double PhotoWidthMm { get; init; } = 14.5;
@@ -34,14 +37,17 @@ public sealed record OverlayLayout
     /// <summary>Fotoğraf kutusunun yüksekliği.</summary>
     public double PhotoHeightMm { get; init; } = 13.0;
 
-    /// <summary>Ad değerinin yazılacağı X konumu ("Adı:" etiketinin sağı).</summary>
-    public double NameXMm { get; init; } = 35.0;
+    /// <summary>
+    /// Ad değerinin yazılacağı X konumu ("Adı:" etiketinin sağı).
+    /// İlk baskıda etiketle arasında fazla boşluk kaldı, 3 mm sola alındı.
+    /// </summary>
+    public double NameXMm { get; init; } = 32.0;
 
     /// <summary>Ad değerinin taban çizgisi — "Adı:" etiketiyle aynı satır.</summary>
     public double NameYMm { get; init; } = 61.0;
 
-    /// <summary>Soyad değerinin yazılacağı X konumu.</summary>
-    public double SurnameXMm { get; init; } = 35.0;
+    /// <summary>Soyad değerinin yazılacağı X konumu — ad ile aynı hizada.</summary>
+    public double SurnameXMm { get; init; } = 32.0;
 
     /// <summary>Soyad değerinin taban çizgisi — "Soyadı:" etiketiyle aynı satır.</summary>
     public double SurnameYMm { get; init; } = 65.5;
