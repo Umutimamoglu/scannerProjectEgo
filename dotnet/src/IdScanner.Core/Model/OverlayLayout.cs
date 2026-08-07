@@ -28,11 +28,11 @@ public sealed record OverlayLayout
     /// <summary>
     /// Fotoğraf kutusunun üst kenarı.
     ///
-    /// Gerçek baskılara bakılarak ayarlandı (55 → 53 → 50 → 50,5).
+    /// Gerçek baskılara bakılarak ayarlandı (55 → 53 → 50 → 50,5 → 51).
     /// <b>47,5 mm'nin altına inilmemeli</b> — renkli bant orada başlıyor,
     /// üstünde kalan kısım siyah-beyaz basar.
     /// </summary>
-    public double PhotoYMm { get; init; } = 50.5;
+    public double PhotoYMm { get; init; } = 51.0;
 
     /// <summary>Fotoğraf kutusunun genişliği.</summary>
     public double PhotoWidthMm { get; init; } = 14.5;
