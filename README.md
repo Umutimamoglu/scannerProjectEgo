@@ -41,6 +41,10 @@ varlıkları .NET uygulamasının çıktı klasörüne otomatik kopyalanır. Bu 
 eksikse uygulama açılabilir ama tarama, baskı veya sertifika zinciri doğrulaması
 çalışmaz.
 
+`native_x64/depends/f/` altındaki model dosyaları (Caffe SSD ağı + Haar
+cascade XML'leri) kod değil, `CardProcessor.dll`'in OpenCV tabanlı yüz
+tespiti/kırpma özelliğinin kullandığı hazır eğitilmiş modellerdir.
+
 ## Kurulum
 
 ### 1. .NET 10 SDK
@@ -186,12 +190,16 @@ görsellerinin olduğu uç önde. Besleme yönü zorunlu olarak değişirse aray
 
 ### Passive Authentication
 
-`IdScanner.Crypto` içindeki `PassiveAuthVerifier` şu kontrolleri yapar:
+Durum: Tamamlandı.
 
-- EF.SOD okunur ve LDS Security Object ayrıştırılır
-- Okunan her DG'nin hash'i SOD içindeki hash ile karşılaştırılır
-- SOD CMS imzası Document Signer sertifikasıyla doğrulanır
-- Document Signer sertifikası `certs/` altındaki CSCA köklerine zincirlenir
+| Adım | Ne yapıyor | Durum |
+|---|---|---|
+| P1 - Tahrifat kontrolü | Her DG'nin hash'i yeniden hesaplanıp SOD'daki değerle karşılaştırılır | Tamamlandı |
+| P2 - İmza ve sertifika zinciri | SOD imzası doğrulanır, Document Signer sertifikası CSCA kök sertifikasına kadar zincirlenir | Tamamlandı |
+
+Bu kontroller `IdScanner.Crypto` içindeki `PassiveAuthVerifier` tarafından
+yapılır. EF.SOD okunur, LDS Security Object ayrıştırılır, DG hash'leri
+karşılaştırılır ve imza/zincir sonucu raporlanır.
 
 Yüklü kökler:
 
@@ -201,8 +209,16 @@ Yüklü kökler:
 
 ### Active Authentication
 
-DG15 varsa uygulama çipe 8 bayt rastgele challenge gönderir. Çipin döndürdüğü
-imza DG15'teki public key ile doğrulanır. RSA / ISO9796-2 ve ECDSA-Plain
+
+| Adım | Ne yapıyor | Durum |
+|---|---|---|
+| A1 - Challenge gönderme | Çipe rastgele, tek seferlik 8 bayt soru gönderilir | Kod hazır, test aşamasında |
+| A2 - Çipin imzalaması | Çip gizli anahtarıyla soruyu imzalar ve cevabı döndürür | Kod hazır, test aşamasında |
+| A3 - Cevabın doğrulanması | İmza DG15'teki public key ile kontrol edilir | Kod hazır, test aşamasında |
+
+Bu durum eski `feature/chip-verification` dalına değil, bu README'nin anlattığı
+.NET main koduna aittir. DG15 varsa `PassportChipReader` çipe challenge gönderir;
+`ActiveAuthVerifier` dönen imzayı doğrular. RSA / ISO9796-2 ve ECDSA-Plain
 kombinasyonları desteklenir.
 
 Doğrulama sonucu şu an bilgilendirici moddadır: başarısızlık loglanır ama okuma
@@ -422,7 +438,7 @@ Sık karşılaşılan bayraklar:
 Tam liste `EvolisFlags.Names` içinde tutulur. Arayüz yalnızca raporlanabilir
 olanları gösterir; `CFG_` ve `RSV_` gibi gürültü üreten bayraklar filtrelenir.
 
-### Okuyucu dönüş kodları (`IDSIF.dll`)
+### Okuyucu dönüş kodları (`IDSIF.dll`, Creator CRT-603-7005)
 
 Kaynak: `native_x64/crtIDS.h`.
 
